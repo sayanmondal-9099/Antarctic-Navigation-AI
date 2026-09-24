@@ -18,14 +18,16 @@ class Settings:
 
     @property
     def cors_origins(self) -> List[str]:
-        if self.APP_ENV == "development" or self.APP_ENV == "demo":
-            return [
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                self.FRONTEND_URL
-            ]
-        return [self.FRONTEND_URL]
+        origins: List[str] = []
+        raw_urls = os.getenv("FRONTEND_URL", "http://localhost:5173,https://frontend-theta-lilac-40.vercel.app")
+        for u in raw_urls.split(","):
+            u = u.strip().rstrip("/")
+            if u and u not in origins:
+                origins.append(u)
+        if self.APP_ENV in ("development", "demo"):
+            for dev_url in ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"]:
+                if dev_url not in origins:
+                    origins.append(dev_url)
+        return origins
 
 settings = Settings()
