@@ -71,9 +71,17 @@ class DemoDataProvider(BaseDataProvider):
 
     def __init__(self, sample_dir: Optional[Path] = None):
         if sample_dir is None:
-            # Locate data/sample directory relative to project root
-            base_dir = Path(__file__).resolve().parent.parent.parent.parent
-            self.sample_dir = base_dir / "data" / "sample"
+            # Locate data/sample directory relative to project root or Docker container
+            dev_dir = Path(__file__).resolve().parent.parent.parent.parent / "data" / "sample"
+            docker_dir = Path(__file__).resolve().parent.parent.parent / "data" / "sample"
+            if dev_dir.exists():
+                self.sample_dir = dev_dir
+            elif docker_dir.exists():
+                self.sample_dir = docker_dir
+            elif Path("/app/data/sample").exists():
+                self.sample_dir = Path("/app/data/sample")
+            else:
+                self.sample_dir = dev_dir
         else:
             self.sample_dir = sample_dir
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Wind, Droplets, ThermometerSnowflake, Info } from 'lucide-react';
+import { apiClient } from '../services/api/client';
 
 interface EnvironmentSummary {
   weather: any;
@@ -24,10 +25,10 @@ export function EnvironmentPanel({ latitude, longitude }: EnvironmentPanelProps)
     const fetchEnv = async () => {
       setLoading(true);
       try {
-        const url = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-        const res = await fetch(`${url}/environment/summary?latitude=${latitude}&longitude=${longitude}`);
-        const json = await res.json();
-        if (active) setData(json);
+        const res = await apiClient.get<EnvironmentSummary>("/environment/summary", {
+          params: { latitude, longitude }
+        });
+        if (active) setData(res.data);
       } catch (err) {
         console.error("Failed to fetch environment:", err);
       } finally {

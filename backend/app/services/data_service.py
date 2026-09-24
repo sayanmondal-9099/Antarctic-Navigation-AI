@@ -3,8 +3,28 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-DATA_SAMPLE_DIR = Path(__file__).parent.parent.parent.parent / "data" / "sample"
-DATA_PROCESSED_DIR = Path(__file__).parent.parent.parent.parent / "data" / "processed"
+def _resolve_sample_dir() -> Path:
+    p = Path(__file__).resolve().parent.parent.parent.parent / "data" / "sample"
+    if p.exists():
+        return p
+    p = Path(__file__).resolve().parent.parent.parent / "data" / "sample"
+    if p.exists():
+        return p
+    if Path("/app/data/sample").exists():
+        return Path("/app/data/sample")
+    return p
+
+def _resolve_processed_dir() -> Path:
+    p = Path(__file__).resolve().parent.parent.parent.parent / "data" / "processed"
+    if p.parent.exists():
+        return p
+    p = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
+    if p.parent.exists():
+        return p
+    return Path("/app/data/processed")
+
+DATA_SAMPLE_DIR = _resolve_sample_dir()
+DATA_PROCESSED_DIR = _resolve_processed_dir()
 
 class DataPipelineService:
     def __init__(self):
