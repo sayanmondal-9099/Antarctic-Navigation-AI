@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Header,
   type ScreenId,
@@ -8,53 +8,58 @@ import {
   NavigatorScreen,
   RouteCalculatorScreen,
   ConflictResolverScreen,
+  FleetDashboard,
+  LoginScreen,
+  SimulationController,
 } from "./components";
+import { onAuthStateChanged, type AppUser } from "./services/supabase/auth";
 import {
-  initialVessel,
-  recommendedRoute,
   initialRiskAnalysis,
 } from "./data/mockNavigationData";
-import type { VesselState, NavigationRoute } from "./types/navigation";
+import { useSimulation } from "./hooks/useSimulation";
 import "./App.css";
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("command_center");
-  const [vessel, setVessel] = useState<VesselState>(initialVessel);
-  const [activeRoute, setActiveRoute] = useState<NavigationRoute>(recommendedRoute);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
-  const handleSpeedChange = (newSpeed: number) => {
-    setVessel((prev) => ({
-      ...prev,
-      speedKnots: newSpeed,
-      engineLoadPercentage: Math.min(100, Math.round((newSpeed / 18) * 85 + 10)),
-      hullStrainMpa: parseFloat((10 + (newSpeed / 14.2) * 3.5).toFixed(1)),
-      status: newSpeed === 0 ? "anchored" : newSpeed > 13 ? "cruising" : "icebreaking",
-    }));
-  };
+  const simulation = useSimulation();
+  
+  // Use simulation state as the source of truth for the app
+  const vessel = simulation.vessel;
+  const activeRoute = simulation.activeRoute;
+  const riskAnalysis = { ...initialRiskAnalysis, overallLevel: simulation.riskLevel as "LOW" | "MODERATE" | "HIGH" | "CRITICAL" };
 
-  const handleApplyRoute = (newRoute: NavigationRoute, destinationName: string) => {
-    setActiveRoute(newRoute);
-    setVessel((prev) => ({
-      ...prev,
-      destination: destinationName,
-      eta: `${newRoute.estimatedDurationHours} Hours`,
-    }));
-    // Switch to Navigator to fly the newly calculated route
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      setAuthInitialized(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  if (!authInitialized) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span className="brand-pulse-ring" style={{ position: 'relative' }}></span>
+          <span>INITIALIZING SYSTEM...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen onLoginSuccess={setUser} />;
+  }
+
+  const handleApplyRoute = () => {
+    // Only used outside simulation
     setActiveScreen("navigator");
   };
 
-  const handleExecuteDeconfliction = (
-    newRoute: NavigationRoute,
-    newHeading: number,
-    newSpeed: number
-  ) => {
-    setActiveRoute(newRoute);
-    setVessel((prev) => ({
-      ...prev,
-      headingDegrees: newHeading,
-      speedKnots: newSpeed,
-    }));
-    // Switch to Navigator to fly the deconflicted corridor
+  const handleExecuteDeconfliction = () => {
     setActiveScreen("navigator");
   };
 
@@ -66,21 +71,30 @@ function App() {
         callSign={vessel.callSign}
         activeScreen={activeScreen}
         onScreenChange={setActiveScreen}
+        user={user}
       />
 
       {/* ── Screen 1: Command Center (Overview & Map) ─────────── */}
       {activeScreen === "command_center" && (
         <main className="command-main-grid">
-          {/* Top: Tactical Antarctic Navigation Map */}
+          {/* Left Sidebar: Compact Risk and Status */}
+          <aside className="grid-area-left">
+            <RiskAnalysisPanel initialRisk={riskAnalysis} />
+            <ShipStatusPanel vessel={vessel} onSpeedChange={() => {}} />
+          </aside>
+
+          {/* Center: Tactical Antarctic Navigation Map */}
           <section className="grid-area-map">
-            <AntarcticMap vessel={vessel} recommendedRoute={activeRoute} />
+            <AntarcticMap vessel={vessel} recommendedRoute={activeRoute} simulationTime={simulation.time} setSimulationTime={simulation.setTime} />
+            {/* Primary Action Button Floating */}
+            <div className="map-floating-actions">
+               <button className="primary-action-btn" onClick={() => simulation.setIsPlaying(!simulation.isPlaying)}>
+                 {simulation.isPlaying ? "PAUSE SIMULATION" : simulation.time === 0 ? "START OPERATIONAL SIMULATION" : "RESUME SIMULATION"}
+               </button>
+            </div>
           </section>
 
-          {/* Bottom Split: Ship Status (Left) and Risk Analysis (Right) */}
-          <div className="grid-area-bottom-split">
-            <ShipStatusPanel vessel={vessel} onSpeedChange={handleSpeedChange} />
-            <RiskAnalysisPanel initialRisk={initialRiskAnalysis} />
-          </div>
+          {/* Right Sidebar: Removed for map emphasis. Could add collapsible details here later. */}
         </main>
       )}
 
@@ -112,24 +126,35 @@ function App() {
         </main>
       )}
 
+      {/* ── Screen 5: Fleet Dashboard ───────────────────────────────── */}
+      {activeScreen === "fleet_dashboard" && (
+        <main className="command-main-grid" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="flex h-full w-full justify-center">
+            <FleetDashboard />
+          </div>
+        </main>
+      )}
+
+      {/* ── Simulation Controller (Timeline and Playback) ──────── */}
+      {activeScreen === "command_center" && (
+         <SimulationController 
+           time={simulation.time}
+           isPlaying={simulation.isPlaying}
+           onPlayPause={() => simulation.setIsPlaying(!simulation.isPlaying)}
+           onReset={simulation.reset}
+           speedMultiplier={simulation.speedMultiplier}
+           onSpeedChange={simulation.setSpeedMultiplier}
+           status={simulation.simulationStatus}
+         />
+      )}
+
       {/* ── Tactical Status Footer ─────────────────────────────── */}
-      <footer className="command-footer">
+      <footer className="command-footer" style={{ marginTop: 'auto', paddingTop: '12px' }}>
         <div className="footer-status-line">
           <span className="footer-indicator">●</span>
           <span>ANTARCTIC AUTONOMOUS MARITIME SAFETY SYSTEM</span>
           <span className="footer-separator">|</span>
           <span>POLAR CODE CATEGORY A / PC2 COMPLIANT</span>
-          <span className="footer-separator">|</span>
-          <span>
-            ACTIVE VIEW:{" "}
-            {activeScreen === "conflict_resolver"
-              ? "SCREEN 4 (CONFLICT RESOLVER & ALTERNATIVES)"
-              : activeScreen === "route_calculator"
-              ? "SCREEN 3 (ROUTE CALCULATOR)"
-              : activeScreen === "navigator"
-              ? "SCREEN 2 (NAVIGATOR PILOT)"
-              : "SCREEN 1 (COMMAND CENTER)"}
-          </span>
         </div>
       </footer>
     </div>

@@ -14,7 +14,7 @@ The overarching phases of the Antarctic Navigation AI project are defined as fol
 10. **Risk engine** (Evaluating navigation risks)
 11. **A* routing** (Deterministic safe-path routing)
 12. **Multi-vessel routing** (Conflict resolution and awareness)
-13. **Firebase** (Database, Auth, Hosting)
+13. **Supabase** (PostgreSQL Database, Auth)
 14. **ML** (Predictive modeling and augmentation)
 15. **Real data APIs** (NSIDC, Copernicus, live AIS)
 16. **SOS** (Emergency monitoring)

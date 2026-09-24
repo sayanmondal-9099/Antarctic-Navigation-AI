@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { NavigationRoute } from "../types/navigation";
 import type { ConflictScenario, DeconflictionOption } from "../types/conflict";
 import { initialConflictScenarios } from "../data/mockConflictData";
-import { fetchDeconfliction } from "../api/client";
+import { fetchDeconfliction } from "../services/api";
 
 interface ConflictResolverScreenProps {
   onExecuteDeconfliction: (route: NavigationRoute, newHeading: number, newSpeed: number) => void;
@@ -18,8 +18,10 @@ export function ConflictResolverScreen({ onExecuteDeconfliction }: ConflictResol
   useEffect(() => {
     let isMounted = true;
     fetchDeconfliction()
-      .then((data) => {
-        if (!isMounted || !data || !data.options) return;
+      .then((data: any) => {
+        if (!isMounted || !data) return;
+        const cpa = data.kinematics?.cpa_nm ?? data.cpa_initial_nm ?? 0.8;
+        const tcpa = data.kinematics?.tcpa_minutes ?? data.tcpa_initial_minutes ?? 14.5;
         // Merge backend dynamic encounter
         setScenarios((prev) => {
           const updated = [...prev];
@@ -27,8 +29,8 @@ export function ConflictResolverScreen({ onExecuteDeconfliction }: ConflictResol
           if (matchIdx >= 0) {
             updated[matchIdx] = {
               ...updated[matchIdx],
-              currentCpaNm: data.kinematics.cpa_nm,
-              tcpaMinutes: data.kinematics.tcpa_minutes,
+              currentCpaNm: cpa,
+              tcpaMinutes: tcpa,
             };
           }
           return updated;
@@ -105,13 +107,13 @@ export function ConflictResolverScreen({ onExecuteDeconfliction }: ConflictResol
         <div className="alarm-metrics-summary font-mono">
           <div className="summary-chip">
             <span className="chip-label">CURRENT CPA</span>
-            <span className={`chip-val ${isResolved ? "highlight-green" : "highlight-red"}`}>
+            <span className={`chip-val ${isResolved ? "status-low" : "status-crit"}`}>
               {isResolved ? `${selectedOption.projectedCpaNm} NM` : `${activeScenario.currentCpaNm} NM`}
             </span>
           </div>
           <div className="summary-chip">
             <span className="chip-label">TIME TO CPA (TCPA)</span>
-            <span className={`chip-val ${isResolved ? "highlight-green" : "highlight-amber"}`}>
+            <span className={`chip-val ${isResolved ? "status-low" : "status-mod"}`}>
               {isResolved ? "CLEARED" : `${activeScenario.tcpaMinutes} mins`}
             </span>
           </div>
@@ -271,15 +273,15 @@ export function ConflictResolverScreen({ onExecuteDeconfliction }: ConflictResol
                     <div className="card-metrics-grid font-mono">
                       <div className="metric-cell">
                         <span className="cell-label">NEW CPA</span>
-                        <span className="cell-value highlight-green">{opt.projectedCpaNm} NM</span>
+                        <span className="cell-value status-low">{opt.projectedCpaNm} NM</span>
                       </div>
                       <div className="metric-cell">
                         <span className="cell-label">NEW HEADING</span>
-                        <span className="cell-value highlight-cyan">{opt.newHeadingDeg}°</span>
+                        <span className="cell-value status-cyan">{opt.newHeadingDeg}°</span>
                       </div>
                       <div className="metric-cell">
                         <span className="cell-label">NEW SPEED</span>
-                        <span className="cell-value highlight-amber">{opt.newSpeedKnots} kts</span>
+                        <span className="cell-value status-mod">{opt.newSpeedKnots} kts</span>
                       </div>
                       <div className="metric-cell">
                         <span className="cell-label">TIME DELAY</span>

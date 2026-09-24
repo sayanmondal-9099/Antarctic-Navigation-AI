@@ -1,180 +1,98 @@
 import { useState } from "react";
-import type { RiskAnalysis, RiskFactor } from "../types/navigation";
+import type { RiskAnalysis } from "../types/navigation";
+
+// Extend type locally to include overallLevel string from App
+interface ExtendedRiskAnalysis extends RiskAnalysis {
+  overallLevel?: "LOW" | "MODERATE" | "HIGH" | "CRITICAL";
+}
 
 interface RiskAnalysisPanelProps {
-  initialRisk: RiskAnalysis;
+  initialRisk: ExtendedRiskAnalysis;
 }
 
 export function RiskAnalysisPanel({ initialRisk }: RiskAnalysisPanelProps) {
-  const [riskData, setRiskData] = useState<RiskAnalysis>(initialRisk);
-  const [simulationActive, setSimulationActive] = useState<boolean>(false);
+  const [showDetails, setShowDetails] = useState(false);
 
-  // Helper to render ASCII / Segmented Block Meters matching the user wireframe: █████░
-  const renderSegmentedBar = (filled: number, total = 6) => {
-    const filledBlocks = "█".repeat(Math.min(total, Math.max(0, filled)));
-    const emptyBlocks = "░".repeat(Math.max(0, total - filled));
-    return `${filledBlocks}${emptyBlocks}`;
-  };
-
-  const getRiskColorClass = (rating: RiskFactor["rating"]) => {
-    switch (rating) {
-      case "Critical":
-        return "risk-critical";
-      case "Severe":
-        return "risk-severe";
-      case "Elevated":
-        return "risk-elevated";
-      case "Moderate":
-        return "risk-moderate";
-      case "Nominal":
-      default:
-        return "risk-nominal";
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case "CRITICAL": return "#ef4444";
+      case "HIGH": return "#f97316";
+      case "MODERATE": return "#fbbf24";
+      default: return "#34d399";
     }
   };
 
-  // Toggle simulated storm/ice conditions
-  const toggleSimulation = () => {
-    if (!simulationActive) {
-      setRiskData({
-        overallSafetyScore: 64,
-        threatStatus: "ADVISORY",
-        factors: [
-          {
-            category: "Ice",
-            scorePercent: 94,
-            rating: "Critical",
-            barSegments: 6,
-            details: "Dynamic ice convergence: Fast ice pressure ridges forming at WP-03",
-            trend: "rising",
-          },
-          {
-            category: "Iceberg",
-            scorePercent: 78,
-            rating: "Severe",
-            barSegments: 5,
-            details: "Iceberg A-81 accelerated drift (1.6 kts) into primary corridor",
-            trend: "rising",
-          },
-          {
-            category: "Weather",
-            scorePercent: 68,
-            rating: "Elevated",
-            barSegments: 4,
-            details: "Severe blizzard gusting 58 kts, visibility < 0.2 nm",
-            trend: "rising",
-          },
-          {
-            category: "Vessel",
-            scorePercent: 32,
-            rating: "Moderate",
-            barSegments: 2,
-            details: "Hull vibration registered in forward bow frame",
-            trend: "rising",
-          },
-        ],
-        advisories: [
-          "URGENT: Re-routing recommended to divert 8.5 nm West of A-81 drift trajectory.",
-          "Reduce propulsion to 7.5 kts to prevent hull ice compression strain.",
-          "Prepare thermal anti-icing for bridge forward radar array.",
-        ],
-      });
-      setSimulationActive(true);
-    } else {
-      setRiskData(initialRisk);
-      setSimulationActive(false);
-    }
-  };
+  const level = initialRisk.overallLevel || "LOW";
+  const color = getRiskColor(level);
 
   return (
-    <section className="command-panel risk-analysis-panel">
-      <div className="panel-header">
-        <div className="panel-title-row">
-          <span className="panel-icon">⚠️</span>
-          <h3>RISK ANALYSIS</h3>
-        </div>
-        <div className="panel-header-actions">
-          <button
-            type="button"
-            className={`btn-sim-toggle ${simulationActive ? "active" : ""}`}
-            onClick={toggleSimulation}
-            title="Simulate severe weather/iceberg drift changes"
-          >
-            {simulationActive ? "⚡ STORM SIMULATION [ACTIVE]" : "🧪 SIMULATE BLIZZARD"}
-          </button>
-          <span className={`badge badge-safety badge-${riskData.threatStatus.toLowerCase()}`}>
-            {riskData.threatStatus}
-          </span>
-        </div>
+    <section className="command-panel risk-analysis-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>NAVIGATION RISK</h3>
+        <span style={{ 
+          background: `${color}33`, 
+          color: color, 
+          padding: '4px 12px', 
+          borderRadius: '4px',
+          fontWeight: 800,
+          border: `1px solid ${color}66`
+        }}>
+          {level}
+        </span>
       </div>
 
-      <div className="panel-body">
-        {/* Overall Safety Gauge Score */}
-        <div className="safety-index-banner">
-          <div className="safety-score-circle">
-            <span className="score-num font-mono">{riskData.overallSafetyScore}</span>
-            <span className="score-den">/100</span>
-          </div>
-          <div className="safety-summary-text">
-            <span className="safety-headline">
-              {riskData.threatStatus === "SECURE"
-                ? "AI ROUTE OPTIMAL — COLLISION AVOIDANCE SECURED"
-                : "TACTICAL ALERT — ADVERSE POLAR ICE CONVERGENCE"}
-            </span>
-            <span className="safety-sub">
-              Dynamic multi-factor risk assessment computed across vessel corridor
-            </span>
-          </div>
-        </div>
-
-        {/* Risk Factor Gauges matching wireframe categories */}
-        <div className="risk-factors-list">
-          {riskData.factors.map((factor) => {
-            const colorClass = getRiskColorClass(factor.rating);
-            const blockBar = renderSegmentedBar(factor.barSegments, 6);
-
-            return (
-              <div key={factor.category} className={`risk-factor-row ${colorClass}`}>
-                <div className="factor-main-line">
-                  <span className="factor-category font-mono">{factor.category.padEnd(8, " ")}</span>
-                  
-                  {/* Segmented ASCII Bar display matching wireframe */}
-                  <span className="factor-ascii-bar font-mono" title={`${factor.scorePercent}%`}>
-                    {blockBar}
-                  </span>
-
-                  <span className="factor-percentage font-mono">{factor.scorePercent}%</span>
-                  <span className={`factor-badge badge-${factor.rating.toLowerCase()}`}>
-                    {factor.rating.toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="factor-details-line">
-                  <span className="trend-icon">
-                    {factor.trend === "rising" ? "▲" : factor.trend === "declining" ? "▼" : "▶"}
-                  </span>
-                  <span className="details-text">{factor.details}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* AI Tactical Advisories Box */}
-        <div className="advisories-card">
-          <div className="advisories-header">
-            <span className="advisory-icon">🤖</span>
-            <span className="advisory-title">AI NAVIGATION ADVISORIES</span>
-          </div>
-          <ul className="advisories-list">
-            {riskData.advisories.map((advisory, idx) => (
-              <li key={idx} className="advisory-item">
-                <span className="advisory-bullet">›</span>
-                <span>{advisory}</span>
-              </li>
+      {level !== "LOW" && (
+        <div style={{ fontSize: '0.85rem' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>WHY?</strong>
+          <ul style={{ paddingLeft: '16px', margin: '8px 0', color: 'var(--text-secondary)' }}>
+            {initialRisk.factors.filter(f => f.rating === "Critical" || f.rating === "Severe").map((factor, i) => (
+               <li key={i}>{factor.details}</li>
             ))}
           </ul>
         </div>
-      </div>
+      )}
+
+      <button 
+        style={{ 
+          background: 'transparent', 
+          border: '1px solid var(--border-subtle)', 
+          color: 'var(--text-secondary)',
+          padding: '6px',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '0.75rem'
+        }}
+        onClick={() => setShowDetails(!showDetails)}
+      >
+        [{showDetails ? "HIDE DETAILS" : "VIEW DETAILS"}]
+      </button>
+
+      {showDetails && (
+        <div className="risk-factors-list" style={{ marginTop: '12px' }}>
+          {initialRisk.factors.map((factor) => (
+             <div key={factor.category} style={{ fontSize: '0.75rem', marginBottom: '8px', padding: '8px', background: 'var(--bg-surface)', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                   <strong>{factor.category}</strong>
+                   <span style={{ color: getRiskColor(factor.rating.toUpperCase()) }}>{factor.rating}</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)' }}>{factor.details}</div>
+             </div>
+          ))}
+          <div className="advisories-card" style={{ marginTop: '12px' }}>
+            <div className="advisories-header">
+              <span className="advisory-title">AI ADVISORIES</span>
+            </div>
+            <ul className="advisories-list">
+              {initialRisk.advisories.map((advisory, idx) => (
+                <li key={idx} className="advisory-item">
+                  <span className="advisory-bullet">›</span>
+                  <span>{advisory}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

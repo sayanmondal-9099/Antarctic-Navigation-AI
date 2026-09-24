@@ -1,5 +1,15 @@
-from typing import List, Dict, Any
-from app.models.schemas import RiskEvaluationResponse, RiskFactor
+"""
+Integrated Situational Risk Assessment Engine.
+Connects Normalized Providers and the Standalone RiskCalculator to produce
+situational risk evaluations and spatial risk assessments.
+"""
+
+from typing import List, Dict, Any, Optional
+from app.models.schemas import RiskEvaluationResponse, RiskFactor, VesselRiskAssessment, AreaRiskAssessment
+from app.models.data_models import NormalizedVessel, NormalizedIceberg, NormalizedEnvironmentalSnapshot
+from app.data.providers import DemoDataProvider, BaseDataProvider
+from app.risk.calculator import RiskCalculator, RiskConfig, haversine_distance_nm
+
 
 def evaluate_situational_risk(
     icebergs_data: List[Dict[str, Any]],
@@ -7,62 +17,131 @@ def evaluate_situational_risk(
     vessel_id: str = "vessel-A"
 ) -> RiskEvaluationResponse:
     """
-    Deterministic multi-factor risk assessment.
+    Deterministic multi-factor risk assessment (Backward-compatible schema).
     Calculates safety scores, threat levels, and advisories based on iceberg density and traffic.
     """
-    icebergs_count = len(icebergs_data)
-    nearby_vessels_count = max(0, len(vessels_data) - 1)  # excluding ownship
+    provider = DemoDataProvider()
+    snapshot = provider.get_snapshot()
+    calculator = RiskCalculator()
 
-    # Base factor calculations
-    ice_score = min(90, 45 + icebergs_count * 3)  # with 12 icebergs ~ 81%
-    iceberg_score = 62
-    weather_score = 38
-    vessel_eng_score = 22
+    # Find the target vessel in normalized vessels or fallback
+    target_vessel = next((v for v in snapshot.vessels if v.id == vessel_id), None)
+    if target_vessel is None and snapshot.vessels:
+        target_vessel = snapshot.vessels[0]
 
-    # Overall safety score out of 100
-    overall_safety = 76
+    if target_vessel:
+        assessment = calculator.evaluate_vessel_risk(target_vessel, snapshot)
+        icebergs_count = len(snapshot.icebergs)
+        nearby_vessels_count = max(0, len(snapshot.vessels) - 1)
 
-    factors = [
-        RiskFactor(
-            category="Ice",
-            score_percent=ice_score,
-            rating="Severe" if ice_score > 75 else "Moderate",
-            details=f"12 tracked iceberg polygons in navigation sector, multi-year pack floes",
-            trend="stable"
-        ),
-        RiskFactor(
-            category="Iceberg",
-            score_percent=iceberg_score,
-            rating="Moderate",
-            details="Tabular fragments drifting SW; closest hazard perimeter 4.2 NM",
-            trend="stable"
-        ),
-        RiskFactor(
-            category="Weather",
-            score_percent=weather_score,
-            rating="Moderate",
-            details="Katabatic wind gusts 32 kts, sea spray freezing advisory",
-            trend="declining"
-        ),
-        RiskFactor(
-            category="Vessel",
-            score_percent=vessel_eng_score,
-            rating="Nominal",
-            details="PC2 icebreaker hull intact; Ship B passing 18 NM southward",
-            trend="stable"
+        factors = [
+            RiskFactor(
+                category=c.category.title(),
+                score_percent=int(c.score * 100),
+                rating=c.level.title(),
+                details=c.details,
+                trend="stable",
+            )
+            for c in assessment.contributors
+        ]
+
+        return RiskEvaluationResponse(
+            overall_safety_score=assessment.safety_score_percent,
+            threat_status="SECURE" if assessment.risk_level in ["LOW", "MODERATE"] else "ELEVATED",
+            risk_level=assessment.risk_level,
+            icebergs_count=icebergs_count,
+            nearby_vessels_count=nearby_vessels_count,
+            factors=factors,
+            advisories=assessment.explanation,
         )
-    ]
 
+    # Fallback response
     return RiskEvaluationResponse(
-        overall_safety_score=overall_safety,
+        overall_safety_score=76,
         threat_status="SECURE",
         risk_level="MEDIUM",
-        icebergs_count=icebergs_count,
-        nearby_vessels_count=nearby_vessels_count,
-        factors=factors,
-        advisories=[
-            f"Risk Level: MEDIUM. {icebergs_count} icebergs and {nearby_vessels_count} nearby vessel detected.",
-            "Recommended AI route maintains safety buffer > 4.0 NM from all tabular ice hazards.",
-            "Ship A position 60.2°S, 45.3°W on steady course to Demo Station."
-        ]
+        icebergs_count=len(icebergs_data),
+        nearby_vessels_count=max(0, len(vessels_data) - 1),
+        factors=[
+            RiskFactor(
+                category="Iceberg",
+                score_percent=60,
+                rating="Moderate",
+                details="Tabular fragments drifting SW",
+                trend="stable",
+            )
+        ],
+        advisories=["Situational baseline nominal."],
+    )
+
+
+def evaluate_vessel_by_id(
+    vessel_id: str,
+    provider: Optional[BaseDataProvider] = None,
+    config: Optional[RiskConfig] = None
+) -> Optional[VesselRiskAssessment]:
+    """
+    Evaluates standardized VesselRiskAssessment for a given vessel ID.
+    """
+    prov = provider or DemoDataProvider()
+    snapshot = prov.get_snapshot()
+    calculator = RiskCalculator(config=config)
+
+    vessel = next((v for v in snapshot.vessels if v.id == vessel_id), None)
+    if vessel is None:
+        return None
+
+    return calculator.evaluate_vessel_risk(vessel, snapshot)
+
+
+def evaluate_area_risk(
+    min_lat: float = -62.0,
+    max_lat: float = -59.0,
+    min_lon: float = -47.0,
+    max_lon: float = -38.0,
+    grid_step: float = 0.5,
+    provider: Optional[BaseDataProvider] = None,
+    config: Optional[RiskConfig] = None
+) -> AreaRiskAssessment:
+    """
+    Evaluates risk distribution across a spatial bounding box.
+    """
+    prov = provider or DemoDataProvider()
+    snapshot = prov.get_snapshot()
+    calculator = RiskCalculator(config=config)
+
+    grid_scores = []
+    lat_cur = min_lat
+    while lat_cur <= max_lat:
+        lon_cur = min_lon
+        while lon_cur <= max_lon:
+            # Evaluate synthetic point
+            berg_score, _, _, _, _ = calculator.calculate_iceberg_proximity_risk(lat_cur, lon_cur, snapshot.icebergs)
+            ice_score, _, _ = calculator.calculate_sea_ice_risk(lat_cur, lon_cur, snapshot.sea_ice)
+            weather_score, _, _ = calculator.calculate_weather_risk(snapshot.weather)
+
+            pt_score = (
+                berg_score * calculator.config.iceberg_weight +
+                ice_score * calculator.config.ice_weight +
+                weather_score * calculator.config.weather_weight
+            ) / (calculator.config.iceberg_weight + calculator.config.ice_weight + calculator.config.weather_weight)
+
+            grid_scores.append(pt_score)
+            lon_cur += grid_step
+        lat_cur += grid_step
+
+    total_pts = len(grid_scores)
+    avg_risk = round(sum(grid_scores) / total_pts, 3) if total_pts > 0 else 0.0
+    max_risk = round(max(grid_scores), 3) if total_pts > 0 else 0.0
+    crit_count = sum(1 for s in grid_scores if s >= calculator.config.high_threshold)
+    high_count = sum(1 for s in grid_scores if calculator.config.moderate_threshold <= s < calculator.config.high_threshold)
+
+    return AreaRiskAssessment(
+        bounds={"min_lat": min_lat, "max_lat": max_lat, "min_lon": min_lon, "max_lon": max_lon},
+        total_grid_points=total_pts,
+        average_risk=avg_risk,
+        max_risk=max_risk,
+        critical_zones_count=crit_count,
+        high_risk_zones_count=high_count,
+        icebergs_detected=len(snapshot.icebergs),
     )

@@ -57,4 +57,6 @@ export interface CalculatedRouteResult {
   confidenceScore: number; // 0 - 100
   icebergAvoidanceCount: number;
   iceLeadUsagePercent: number;
+  alternatives?: NavigationRoute[];
+  warnings?: string[];
 }

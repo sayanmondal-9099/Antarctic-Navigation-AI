@@ -1,6 +1,6 @@
 import math
 from typing import List, Dict, Any
-from app.models.schemas import Position, Waypoint, RouteResponse
+from app.models.schemas import Position, Waypoint, RouteResponse, RiskBreakdown
 
 def calculate_cpa_tcpa(
     pos_a: Position, speed_a_kts: float, heading_a_deg: float,
@@ -78,6 +78,9 @@ class DeconflictionEngine:
             total_distance_nm=208.5,
             estimated_duration_hours=17.4,
             average_risk_score=24.0,
+            risk_level="LOW",
+            routing_mode="safest",
+            risk_breakdown=RiskBreakdown(ice=20.0, iceberg=15.0, weather=22.0, current=18.0, vessel=10.0),
             waypoints=[
                 Waypoint(id="wp-alt-1a", name="Ship A Origin", lat=pos_a.lat, lon=pos_a.lon, order=1, ice_risk_score=15.0),
                 Waypoint(id="wp-alt-1b", name="Starboard Lead Turn (HDG 115°)", lat=pos_a.lat - 0.25, lon=pos_a.lon + 2.5, order=2, ice_risk_score=22.0),
@@ -93,6 +96,9 @@ class DeconflictionEngine:
             total_distance_nm=204.0,
             estimated_duration_hours=24.0,
             average_risk_score=26.0,
+            risk_level="MODERATE",
+            routing_mode="balanced",
+            risk_breakdown=RiskBreakdown(ice=25.0, iceberg=18.0, weather=24.0, current=20.0, vessel=12.0),
             waypoints=[
                 Waypoint(id="wp-alt-2a", name="Ship A Origin", lat=pos_a.lat, lon=pos_a.lon, order=1, ice_risk_score=15.0),
                 Waypoint(id="wp-alt-2b", name="Hold Corridor (8.5 kts)", lat=pos_a.lat, lon=pos_a.lon + 3.0, order=2, ice_risk_score=24.0),
@@ -108,6 +114,9 @@ class DeconflictionEngine:
             total_distance_nm=221.0,
             estimated_duration_hours=18.4,
             average_risk_score=20.0,
+            risk_level="LOW",
+            routing_mode="fastest",
+            risk_breakdown=RiskBreakdown(ice=18.0, iceberg=12.0, weather=20.0, current=15.0, vessel=8.0),
             waypoints=[
                 Waypoint(id="wp-alt-3a", name="Ship A Origin", lat=pos_a.lat, lon=pos_a.lon, order=1, ice_risk_score=15.0),
                 Waypoint(id="wp-alt-3b", name="North Ridge Gate", lat=pos_a.lat + 0.35, lon=pos_a.lon + 2.8, order=2, ice_risk_score=19.0),

@@ -12,7 +12,7 @@ Safety-first route optimization rather than shortest-distance routing.
 - **Data:** NSIDC, BYU/NIC, Copernicus, ERA5, ISRO/MOSDAC (where available), AIS or simulated vessel positions
 - **Routing:** NetworkX, A*, GeoPandas, Shapely
 - **ML:** PyTorch, XGBoost, scikit-learn
-- **Database/Auth:** Firebase
+- **Database/Auth:** Supabase (PostgreSQL + Supabase Auth)
 
 ## Development Rules
 1. Keep frontend and backend separated.
@@ -33,7 +33,7 @@ Safety-first route optimization rather than shortest-distance routing.
 16. Run tests after significant changes.
 17. Explain major architectural changes before implementing them.
 
-## Firebase Architecture
-1. **Scope:** Firebase primarily manages: users, ships, routes, alerts, configuration, demo state.
-2. **Data Pipeline:** Large scientific datasets should not automatically become Firestore documents.
-3. **Flow:** Scientific datasets -> Python data pipeline -> Processed GeoJSON / Parquet / JSON -> Backend -> Firebase -> Frontend.
+## Supabase Architecture
+1. **Scope:** Supabase primarily manages: users, ships, routes, alerts, configuration, demo state.
+2. **Data Pipeline:** Large scientific datasets should not automatically become PostgreSQL rows.
+3. **Flow:** Scientific datasets -> Python data pipeline -> Processed GeoJSON / Parquet / JSON -> Backend -> Supabase -> Frontend.

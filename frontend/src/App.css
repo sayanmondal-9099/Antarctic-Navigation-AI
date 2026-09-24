@@ -4,29 +4,56 @@
    ========================================================================== */
 
 :root {
-  --bg-deep: #050914;
-  --bg-surface: #0a1122;
-  --bg-surface-elevated: #0f1930;
-  --bg-card: rgba(15, 25, 48, 0.75);
-  --bg-card-hover: rgba(22, 36, 68, 0.85);
+  /* Color Palette - Premium Spatial Glass */
+  --bg-deep: #030610;
+  --bg-surface: rgba(12, 18, 30, 0.45);
+  --bg-surface-elevated: rgba(16, 24, 40, 0.55);
+  --bg-card: rgba(12, 18, 30, 0.65);
+  --bg-card-hover: rgba(22, 36, 68, 0.75);
 
-  --border-subtle: rgba(56, 189, 248, 0.15);
-  --border-active: rgba(56, 189, 248, 0.45);
-  --border-glow: rgba(56, 189, 248, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(255, 255, 255, 0.2);
+  --border-glow: rgba(0, 240, 255, 0.4);
 
   --cyan-bright: #38bdf8;
   --cyan-neon: #00f0ff;
   --cyan-deep: #0284c7;
-  --green-neon: #34d399;
-  --amber-neon: #fbbf24;
-  --red-neon: #f87171;
+
+  /* Semantic Risk Colors */
+  --status-low: #34d399;      /* Emerald 400 */
+  --status-low-bg: rgba(52, 211, 153, 0.15);
+  --status-mod: #fbbf24;      /* Amber 400 */
+  --status-mod-bg: rgba(251, 191, 36, 0.15);
+  --status-high: #f97316;     /* Orange 500 */
+  --status-high-bg: rgba(249, 115, 22, 0.15);
+  --status-crit: #ef4444;     /* Red 500 */
+  --status-crit-bg: rgba(239, 68, 68, 0.15);
+  --status-sos: #dc2626;      /* Red 600 - High Contrast */
+  --status-sos-bg: rgba(220, 38, 38, 0.25);
 
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
 
-  --font-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "ui-monospace", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Spacing & Layout */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Elevations */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 40px -4px rgba(0, 0, 0, 0.55);
 }
 
 /* ── Global App Container ─────────────────────────────────────────────────── */
@@ -320,22 +347,61 @@
 
 /* ── Layout Grids ─────────────────────────────────────────────────────────── */
 
-.command-main-grid,
+.command-main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-areas: 
+    "left-sidebar map";
+  grid-template-rows: 1fr;
+  gap: var(--spacing-md);
+  flex: 1;
+  height: calc(100vh - 140px);
+}
+
+.grid-area-map {
+  grid-area: map;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+}
+
+.grid-area-left {
+  grid-area: left-sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.grid-area-right {
+  grid-area: right-sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .navigator-main-view,
 .planner-main-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--spacing-md);
   flex: 1;
 }
 
-.grid-area-bottom-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
 @media (max-width: 1180px) {
+  .command-main-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: 
+      "map"
+      "left-sidebar"
+      "right-sidebar";
+    grid-template-rows: minmax(400px, 50vh) auto auto;
+    height: auto;
+  }
   .grid-area-bottom-split {
     grid-template-columns: 1fr;
   }
@@ -373,18 +439,23 @@
 
 .ecdis-glass-card {
   position: relative;
-  background: rgba(8, 14, 28, 0.88);
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.05), 0 16px 48px rgba(0, 0, 0, 0.6);
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
 }
 
 .ecdis-top-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  background: linear-gradient(180deg, rgba(14, 24, 48, 0.95) 0%, rgba(10, 18, 36, 0.9) 100%);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+  padding: 16px 24px;
+  background: rgba(10, 14, 23, 0.4);
+  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(12px);
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -611,6 +682,48 @@
   color: #ffffff;
   border-color: #38bdf8;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+/* ── Metocean Forecast Telemetry Strip ───────────────────────────────────── */
+
+.ecdis-metocean-forecast-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 20px;
+  background: rgba(4, 8, 18, 0.98);
+  border-bottom: 1px dashed rgba(56, 189, 248, 0.2);
+  font-size: 0.7rem;
+  flex-wrap: wrap;
+  animation: fadeIn 0.3s ease;
+}
+
+.metocean-pill {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.metocean-pill strong {
+  margin-left: 3px;
+}
+
+.pill-severe {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: #ef4444 !important;
+  color: #fca5a5 !important;
+}
+
+.pill-moderate {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: #f59e0b !important;
+  color: #fde68a !important;
+}
+
+.projected-drift {
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
 }
 
 /* ── Viewport & Canvas ───────────────────────────────────────────────────── */
@@ -1231,14 +1344,14 @@
 }
 
 .risk-factor-row.risk-critical {
-  border-left-color: #ef4444;
-  background: rgba(239, 68, 68, 0.08);
+  border-left-color: var(--status-crit);
+  background: var(--status-crit-bg);
 }
 
-.risk-factor-row.risk-severe { border-left-color: #f87171; }
-.risk-factor-row.risk-elevated { border-left-color: #fbbf24; }
-.risk-factor-row.risk-moderate { border-left-color: #38bdf8; }
-.risk-factor-row.risk-nominal { border-left-color: #34d399; }
+.risk-factor-row.risk-severe { border-left-color: var(--status-crit); }
+.risk-factor-row.risk-elevated { border-left-color: var(--status-mod); }
+.risk-factor-row.risk-moderate { border-left-color: var(--status-mod); }
+.risk-factor-row.risk-nominal { border-left-color: var(--status-low); }
 
 .factor-main-line {
   display: flex;
@@ -1260,8 +1373,8 @@
 }
 
 .risk-critical .factor-ascii-bar,
-.risk-severe .factor-ascii-bar { color: var(--red-neon); }
-.risk-elevated .factor-ascii-bar { color: var(--amber-neon); }
+.risk-severe .factor-ascii-bar { color: var(--status-crit); }
+.risk-elevated .factor-ascii-bar { color: var(--status-mod); }
 
 .factor-percentage {
   font-size: 0.82rem;
@@ -1279,18 +1392,18 @@
 }
 
 .badge-critical, .badge-severe {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
+  background: var(--status-crit-bg);
+  color: var(--status-crit);
 }
 
 .badge-elevated, .badge-moderate {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fde68a;
+  background: var(--status-mod-bg);
+  color: var(--status-mod);
 }
 
 .badge-nominal {
-  background: rgba(52, 211, 153, 0.2);
-  color: #a7f3d0;
+  background: var(--status-low-bg);
+  color: var(--status-low);
 }
 
 .factor-details-line {
@@ -3007,4 +3120,374 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Modular Map Engine Layout & Components ─────────────────────────────── */
+
+.ecdis-map-engine-root {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.ecdis-map-canvas-container {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: 580px;
+  position: relative;
+  background: #020611;
+}
+
+.ecdis-selected-vessel-panel {
+  background: rgba(6, 12, 24, 0.95);
+  border-right: 1px solid var(--border-subtle);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.ecdis-selected-vessel-panel .panel-tag {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--cyan-bright);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ecdis-selected-vessel-panel .panel-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 2px 0;
+}
+
+.ecdis-selected-vessel-panel .panel-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.vessel-switcher-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.switcher-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.switcher-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.vessel-chip-btn {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vessel-chip-btn:hover {
+  border-color: var(--cyan-bright);
+  color: #ffffff;
+}
+
+.vessel-chip-btn.active {
+  background: rgba(2, 132, 199, 0.25);
+  border-color: var(--cyan-bright);
+  color: var(--cyan-bright);
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.telemetry-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  padding: 8px 10px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.telemetry-box.full-width {
+  grid-column: span 2;
+}
+
+.telemetry-box .t-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.telemetry-box .t-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.speed-throttle-section {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.throttle-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.throttle-slider {
+  width: 100%;
+  accent-color: var(--cyan-bright);
+  cursor: pointer;
+}
+
+.throttle-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.panel-demo-disclaimer {
+  font-size: 0.65rem;
+  color: var(--amber-neon);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px dashed rgba(245, 158, 11, 0.3);
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-align: center;
+  margin-top: auto;
+}
+
+/* ── Map Legend ─────────────────────────────────────────────────────────── */
+
+.ecdis-map-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 356px;
+  background: rgba(8, 16, 32, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  backdrop-filter: blur(8px);
+  z-index: 15;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.legend-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--cyan-bright);
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.legend-glyph {
+  font-size: 0.8rem;
+  width: 16px;
+  text-align: center;
+}
+
+.pill-inactive {
+  background: #64748b !important;
+  box-shadow: none !important;
+}
+
+/* ── Responsive Map Layout ──────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .ecdis-map-canvas-container {
+    grid-template-columns: 1fr;
+  }
+
+  .ecdis-selected-vessel-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .ecdis-map-legend {
+    left: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .telemetry-grid {
+    grid-template-columns: 1fr;
+  }
+  .telemetry-box.full-width {
+    grid-column: span 1;
+  }
+  .ecdis-map-legend {
+    display: none;
+  }
+}
+
+/* ── Live Vessel Risk Assessment Card ────────────────────────────────────── */
+
+.vessel-risk-assessment-card {
+  background: rgba(10, 18, 36, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risk-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.risk-header-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.risk-loading {
+  font-size: 0.72rem;
+  padding: 8px 0;
+  animation: pulse-ring 1.5s infinite;
+}
+
+.risk-contributors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.contributor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.contributor-label-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.68rem;
+}
+
+.c-name {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.c-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.contributor-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.contributor-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.contributor-bar-fill.low { background: #10b981; }
+.contributor-bar-fill.moderate { background: #f59e0b; }
+.contributor-bar-fill.high { background: #f97316; }
+.contributor-bar-fill.critical { background: #ef4444; }
+
+.risk-footnote {
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  border-top: 1px dashed rgba(71, 85, 105, 0.4);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+
+
+.map-floating-actions {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+}
+
+.primary-action-btn {
+  background: rgba(2, 132, 199, 0.85);
+  color: white;
+  border: 1px solid #00f0ff;
+  padding: 12px 24px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.4);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.primary-action-btn:hover {
+  background: rgba(2, 132, 199, 1);
+  box-shadow: 0 6px 28px rgba(0, 240, 255, 0.6);
+  transform: translateY(-2px);
 }

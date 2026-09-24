@@ -1,0 +1,119 @@
+.simulation-controller-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(10, 18, 36, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+  margin-top: 16px;
+  gap: 24px;
+}
+
+.sim-status-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-mode-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  letter-spacing: 0.08em;
+}
+
+.sim-time-display {
+  font-family: "ui-monospace", "SF Mono", monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.sim-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sim-btn {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #f1f5f9;
+  font-size: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sim-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  transform: scale(1.05);
+}
+
+.primary-sim-btn {
+  background: rgba(2, 132, 199, 0.3);
+  border-color: #00f0ff;
+  color: #00f0ff;
+  width: 48px;
+  height: 48px;
+  font-size: 1.2rem;
+}
+
+.primary-sim-btn:hover {
+  background: rgba(2, 132, 199, 0.5);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+.sim-speed-controls {
+  display: flex;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sim-speed-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sim-speed-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.sim-event-feed {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sim-event-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 16px;
+  border-radius: 6px;
+  border-left: 3px solid #38bdf8;
+}

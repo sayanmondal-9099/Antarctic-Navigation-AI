@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { NavigationRoute } from "../types/navigation";
 import type {
   RiskToleranceLevel,
@@ -11,7 +11,7 @@ import {
   vesselFleet,
   calculateOptimizedRoute,
 } from "../data/mockPlannerData";
-import { optimizeRoute } from "../api/client";
+import { optimizeRoute } from "../services/api";
 
 interface RouteCalculatorScreenProps {
   onApplyRoute: (route: NavigationRoute, destinationName: string) => void;
@@ -55,23 +55,25 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
     const vesselObj = vesselFleet.find((v) => v.id === vesselId) || vesselFleet[0];
 
     try {
-      const apiRes = await optimizeRoute(
-        { lat: originObj.coord.lat, lon: originObj.coord.lng },
-        { lat: destObj.coord.lat, lon: destObj.coord.lng },
-        riskTolerance,
-        vesselObj.economicSpeedKnots
-      );
+      const apiRes = await optimizeRoute({
+        origin: { lat: originObj.coord.lat, lon: originObj.coord.lng },
+        destination: { lat: destObj.coord.lat, lon: destObj.coord.lng },
+        vessel_id: vesselId,
+        risk_tolerance: riskTolerance,
+      });
 
-      if (apiRes && apiRes.waypoints && apiRes.waypoints.length > 0) {
+      const rec = apiRes?.recommended_route;
+
+      if (rec && rec.waypoints && rec.waypoints.length > 0) {
         const mappedNavRoute: NavigationRoute = {
-          id: apiRes.id,
-          name: apiRes.name,
+          id: rec.id,
+          name: rec.name,
           type: "recommended",
-          totalDistanceNm: apiRes.total_distance_nm,
-          estimatedDurationHours: apiRes.estimated_duration_hours,
-          averageIceRiskScore: Math.round(apiRes.average_risk_score),
+          totalDistanceNm: rec.total_distance_nm,
+          estimatedDurationHours: rec.estimated_duration_hours,
+          averageIceRiskScore: Math.round(rec.average_risk_score),
           color: "#38bdf8",
-          waypoints: apiRes.waypoints.map((wp) => ({
+          waypoints: rec.waypoints.map((wp: any) => ({
             id: wp.id,
             name: wp.name,
             coord: { lat: wp.lat, lng: wp.lon },
@@ -83,8 +85,30 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
           })),
         };
 
-        const directDist = Math.round(apiRes.total_distance_nm * 0.88);
-        const directDur = Math.round(apiRes.estimated_duration_hours * 1.35);
+        const mapAltRoute = (alt: any, idx: number): NavigationRoute => ({
+          id: alt.id,
+          name: alt.name,
+          type: "alternative",
+          totalDistanceNm: alt.total_distance_nm,
+          estimatedDurationHours: alt.estimated_duration_hours,
+          averageIceRiskScore: Math.round(alt.average_risk_score),
+          color: idx === 0 ? "#f59e0b" : "#8b5cf6",
+          waypoints: alt.waypoints.map((wp: any) => ({
+            id: wp.id,
+            name: wp.name,
+            coord: { lat: wp.lat, lng: wp.lon },
+            order: wp.order,
+            iceConcentrationTenths: Math.round(wp.ice_risk_score / 10),
+            iceThicknessMeters: 0.4,
+            estimatedArrival: `+${wp.order * 2}h 45m`,
+            depthMeters: 510,
+          })),
+        });
+
+        const alternatives = (apiRes.alternative_routes || []).map(mapAltRoute);
+
+        const directDist = Math.round(rec.total_distance_nm * 0.88);
+        const directDur = Math.round(rec.estimated_duration_hours * 1.35);
 
         setCalcResult({
           route: mappedNavRoute,
@@ -92,22 +116,24 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
           destination: destObj,
           vessel: vesselObj,
           metrics: {
-            calculatedDistanceNm: apiRes.total_distance_nm,
+            calculatedDistanceNm: rec.total_distance_nm,
             directDistanceNm: directDist,
-            calculatedDurationHours: apiRes.estimated_duration_hours,
+            calculatedDurationHours: rec.estimated_duration_hours,
             directDurationHours: directDur,
-            distanceDeltaNm: Math.round(apiRes.total_distance_nm - directDist),
-            timeSavingsHours: Math.round(directDur - apiRes.estimated_duration_hours),
-            calculatedIceRiskScore: Math.round(apiRes.average_risk_score),
+            distanceDeltaNm: Math.round(rec.total_distance_nm - directDist),
+            timeSavingsHours: Math.round(directDur - rec.estimated_duration_hours),
+            calculatedIceRiskScore: Math.round(rec.average_risk_score),
             directIceRiskScore: 78,
             riskReductionPercent: 68,
-            fuelEstimateLiters: Math.round(apiRes.total_distance_nm * vesselObj.fuelConsumptionLPerNm),
+            fuelEstimateLiters: Math.round(rec.total_distance_nm * vesselObj.fuelConsumptionLPerNm),
           },
           calculatedAtUtc: new Date().toISOString().substring(11, 19) + " UTC",
           confidenceScore: 96,
           riskTolerance: riskTolerance,
           icebergAvoidanceCount: 12,
           iceLeadUsagePercent: 65,
+          alternatives,
+          warnings: apiRes.warnings || [],
         });
       } else {
         const fallbackResult = calculateOptimizedRoute(request);
@@ -313,11 +339,22 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
           </div>
 
           <div className="panel-body">
+            {calcResult.warnings && calcResult.warnings.length > 0 && (
+              <div className="planner-warning-banner" style={{ background: 'var(--bg-surface-elevated)', border: '1px solid var(--status-critical)', padding: '12px', marginBottom: '16px', borderRadius: '4px' }}>
+                <strong style={{ color: 'var(--status-critical)' }}>⚠️ MULTI-VESSEL CONFLICT WARNING:</strong>
+                <ul style={{ margin: '8px 0 0 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  {calcResult.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
             {/* Route Summary KPI Cards */}
             <div className="planner-kpi-grid">
               <div className="planner-kpi-card">
                 <span className="kpi-label">TOTAL DISTANCE</span>
-                <span className="kpi-value font-mono highlight-cyan">
+                <span className="kpi-value font-mono status-cyan">
                   {calcResult.metrics.calculatedDistanceNm} <span className="kpi-unit">NM</span>
                 </span>
                 <span className="kpi-sub">
@@ -327,27 +364,27 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
 
               <div className="planner-kpi-card">
                 <span className="kpi-label">TRANSIT DURATION</span>
-                <span className="kpi-value font-mono highlight-green">
+                <span className="kpi-value font-mono status-low">
                   {calcResult.metrics.calculatedDurationHours} <span className="kpi-unit">HRS</span>
                 </span>
-                <span className="kpi-sub highlight-green font-mono">
+                <span className="kpi-sub status-low font-mono">
                   ⏱️ {calcResult.metrics.timeSavingsHours}h faster than pack ice
                 </span>
               </div>
 
               <div className="planner-kpi-card">
                 <span className="kpi-label">RISK REDUCTION</span>
-                <span className="kpi-value font-mono highlight-cyan">
+                <span className="kpi-value font-mono status-cyan">
                   −{calcResult.metrics.riskReductionPercent}%
                 </span>
                 <span className="kpi-sub">
-                  Ice Threat: <span className="highlight-green font-mono">{calcResult.metrics.calculatedIceRiskScore}/100</span>
+                  Ice Threat: <span className="status-low font-mono">{calcResult.metrics.calculatedIceRiskScore}/100</span>
                 </span>
               </div>
 
               <div className="planner-kpi-card">
                 <span className="kpi-label">ESTIMATED FUEL</span>
-                <span className="kpi-value font-mono highlight-amber">
+                <span className="kpi-value font-mono status-mod">
                   {calcResult.metrics.fuelEstimateLiters.toLocaleString()} <span className="kpi-unit">L</span>
                 </span>
                 <span className="kpi-sub font-mono">
@@ -367,12 +404,12 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
                 {calcResult.route.waypoints.map((wp, i) => (
                   <div key={wp.id} className="calc-wp-row font-mono">
                     <span className="wp-num">0{i + 1}</span>
-                    <span className="wp-name highlight-cyan">{wp.name}</span>
+                    <span className="wp-name status-cyan">{wp.name}</span>
                     <span className="wp-coord">
                       {Math.abs(wp.coord.lat).toFixed(2)}°S, {Math.abs(wp.coord.lng).toFixed(2)}°W
                     </span>
                     <span className="wp-ice">❄️ {wp.iceConcentrationTenths}/10 ({wp.iceThicknessMeters}m)</span>
-                    <span className="wp-eta highlight-green">{wp.estimatedArrival}</span>
+                    <span className="wp-eta status-low">{wp.estimatedArrival}</span>
                   </div>
                 ))}
               </div>
@@ -389,17 +426,41 @@ export function RouteCalculatorScreen({ onApplyRoute }: RouteCalculatorScreenPro
                 <div className="benchmark-header">TRANSIT TIME</div>
                 <div className="benchmark-header">ICE RISK</div>
 
-                <div className="benchmark-cell highlight-cyan font-bold">✨ AI Computed Safe Route</div>
-                <div className="benchmark-cell highlight-cyan">{calcResult.metrics.calculatedDistanceNm} NM</div>
-                <div className="benchmark-cell highlight-green">{calcResult.metrics.calculatedDurationHours} Hours</div>
-                <div className="benchmark-cell highlight-green">LOW ({calcResult.metrics.calculatedIceRiskScore}%)</div>
+                <div className="benchmark-cell status-cyan font-bold">✨ AI Computed Safe Route</div>
+                <div className="benchmark-cell status-cyan">{calcResult.metrics.calculatedDistanceNm} NM</div>
+                <div className="benchmark-cell status-low">{calcResult.metrics.calculatedDurationHours} Hours</div>
+                <div className="benchmark-cell status-low">LOW ({calcResult.metrics.calculatedIceRiskScore}%)</div>
 
-                <div className="benchmark-cell highlight-red">⚠️ Direct Channel Pack Ice</div>
+                <div className="benchmark-cell status-crit">⚠️ Direct Channel Pack Ice</div>
                 <div className="benchmark-cell">{calcResult.metrics.directDistanceNm} NM</div>
-                <div className="benchmark-cell highlight-red">{calcResult.metrics.directDurationHours} Hours</div>
-                <div className="benchmark-cell highlight-red">SEVERE ({calcResult.metrics.directIceRiskScore}%)</div>
+                <div className="benchmark-cell status-crit">{calcResult.metrics.directDurationHours} Hours</div>
+                <div className="benchmark-cell status-crit">SEVERE ({calcResult.metrics.directIceRiskScore}%)</div>
               </div>
             </div>
+
+            {/* Alternative Routes Quick View */}
+            {calcResult.alternatives && calcResult.alternatives.length > 0 && (
+              <div className="comparative-table-box" style={{ marginTop: '20px' }}>
+                <div className="box-header">
+                  <span className="box-title">🔀 ALTERNATIVE PATHFINDING PROFILES</span>
+                </div>
+                <div className="benchmark-grid font-mono">
+                  <div className="benchmark-header">MODE</div>
+                  <div className="benchmark-header">DISTANCE</div>
+                  <div className="benchmark-header">DURATION</div>
+                  <div className="benchmark-header">ICE RISK</div>
+                  
+                  {calcResult.alternatives.map((alt) => (
+                    <React.Fragment key={alt.id}>
+                      <div className="benchmark-cell" style={{ color: alt.color }}>{alt.name}</div>
+                      <div className="benchmark-cell">{alt.totalDistanceNm} NM</div>
+                      <div className="benchmark-cell">{alt.estimatedDurationHours} Hrs</div>
+                      <div className="benchmark-cell">{alt.averageIceRiskScore}%</div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Action Bar: Push to Navigator & Export */}
             <div className="results-actions-bar">

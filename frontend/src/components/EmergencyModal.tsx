@@ -106,7 +106,7 @@ export function EmergencyModal({
 
               <div className="haven-fallback-box">
                 <span className="haven-label">NEAREST ICE SHELTER HAVEN:</span>
-                <span className="haven-value highlight-cyan">
+                <span className="haven-value status-cyan">
                   {emergencyState.nearestShelterHaven.name} ({emergencyState.nearestShelterHaven.distanceNm} NM @ {emergencyState.nearestShelterHaven.bearingDeg}°)
                 </span>
               </div>
@@ -142,28 +142,28 @@ export function EmergencyModal({
               <div className="sar-status-grid">
                 <div className="sar-status-item">
                   <span className="sar-label">EPIRB 406 MHz BEACON</span>
-                  <span className="sar-value highlight-green">
+                  <span className="sar-value status-low">
                     ● BROADCASTING [HEX ID: 367300A89F12]
                   </span>
                 </div>
 
                 <div className="sar-status-item">
                   <span className="sar-label">GMDSS / VHF DSC CHANNEL 16</span>
-                  <span className="sar-value highlight-green">
+                  <span className="sar-value status-low">
                     ● CONTINUOUS LOOP TRANSMISSION
                   </span>
                 </div>
 
                 <div className="sar-status-item">
                   <span className="sar-label">SAR COORDINATION</span>
-                  <span className="sar-value highlight-cyan">
+                  <span className="sar-value status-cyan">
                     {emergencyState.acknowledgedBy || "MRCC Punta Arenas & McMurdo Base [ACKNOWLEDGED]"}
                   </span>
                 </div>
 
                 <div className="sar-status-item">
                   <span className="sar-label">DISPATCHED RESCUE VESSEL</span>
-                  <span className="sar-value highlight-amber">
+                  <span className="sar-value status-mod">
                     {emergencyState.nearestRescueVessel} — ETA: {emergencyState.rescueEtaHours}h
                   </span>
                 </div>

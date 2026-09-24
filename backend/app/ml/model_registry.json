@@ -1,0 +1,20 @@
+{
+    "sea_ice_model": {
+        "model_name": "SeaIceBaseline",
+        "model_version": "v0.0.0",
+        "training_data_range": "N/A",
+        "features": [],
+        "training_timestamp": "N/A",
+        "metrics": {},
+        "status": "unavailable"
+    },
+    "iceberg_model": {
+        "model_name": "IcebergBaseline",
+        "model_version": "v0.0.0",
+        "training_data_range": "N/A",
+        "features": [],
+        "training_timestamp": "N/A",
+        "metrics": {},
+        "status": "unavailable"
+    }
+}

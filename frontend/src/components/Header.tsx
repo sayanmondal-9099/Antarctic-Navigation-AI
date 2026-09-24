@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { type HealthResponse, fetchHealth } from "../api/client";
+import { type HealthResponse, fetchHealth } from "../services/api";
+import type { AppUser } from "../services/supabase/auth";
+import { signOut } from "../services/supabase/auth";
 
-export type ScreenId = "command_center" | "navigator" | "route_calculator" | "conflict_resolver";
+export type ScreenId = "command_center" | "navigator" | "route_calculator" | "conflict_resolver" | "fleet_dashboard";
 
 interface HeaderProps {
   vesselName: string;
   callSign: string;
   activeScreen: ScreenId;
   onScreenChange: (screen: ScreenId) => void;
+  user?: AppUser;
 }
 
 export function Header({
@@ -15,6 +18,7 @@ export function Header({
   callSign,
   activeScreen,
   onScreenChange,
+  user,
 }: HeaderProps) {
   const [health, setHealth] = useState<{
     status: "loading" | "online" | "offline";
@@ -116,6 +120,18 @@ export function Header({
           <p className="brand-subtitle">
             Polar Route Optimization & Ice Collision Avoidance System
           </p>
+          {import.meta.env.VITE_DEMO_MODE === "true" && (
+            <span style={{
+              background: 'var(--status-critical, #ef4444)',
+              color: '#fff',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              letterSpacing: '0.05em',
+              marginLeft: '12px'
+            }}>DEMO MODE</span>
+          )}
         </div>
       </div>
 
@@ -156,13 +172,22 @@ export function Header({
           <span className="tab-text">4. CONFLICT RESOLVER</span>
           <span className="tab-badge-indicator badge-conflict-tab">COLREGS</span>
         </button>
+        <button
+          type="button"
+          className={`nav-tab-btn ${activeScreen === "fleet_dashboard" ? "active" : ""}`}
+          onClick={() => onScreenChange("fleet_dashboard")}
+        >
+          <span className="tab-icon">🚢</span>
+          <span className="tab-text">5. FLEET</span>
+          <span className="tab-badge-indicator">MULTI-VESSEL</span>
+        </button>
       </nav>
 
       {/* ── Telemetry HUD ───────────────────────────────────────────────── */}
       <div className="header-telemetry">
         <div className="telemetry-item">
           <span className="telemetry-label">VESSEL</span>
-          <span className="telemetry-value highlight-cyan">
+          <span className="telemetry-value status-cyan">
             {vesselName} <span className="telemetry-sub">[{callSign}]</span>
           </span>
         </div>
@@ -172,33 +197,95 @@ export function Header({
           <span className="telemetry-value font-mono">{utcTime || "SYNCING..."}</span>
         </div>
 
+        {user && (
+          <div className="telemetry-item">
+            <span className="telemetry-label">OPERATOR</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="telemetry-value status-cyan" style={{ fontSize: '0.85em' }}>
+                {user.email.split('@')[0].toUpperCase()}
+                <span className="telemetry-sub"> [{user.role}]</span>
+              </span>
+              <button 
+                onClick={() => signOut()}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text)',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem'
+                }}
+              >
+                LOGOUT
+              </button>
+              {import.meta.env.VITE_DEMO_MODE === "true" && (
+                <button 
+                  onClick={() => window.location.reload()}
+                  style={{
+                    background: 'var(--status-critical, #ef4444)',
+                    border: '1px solid var(--status-critical, #ef4444)',
+                    color: '#fff',
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  RESET DEMO
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="telemetry-item">
-          <span className="telemetry-label">API SERVER</span>
+          <span className="telemetry-label">SYSTEM</span>
           <div className="health-badge-wrapper">
             {health.status === "loading" && (
               <span className="health-badge health-checking">
-                <span className="dot dot-pulse"></span> CHECKING...
+                <span className="dot dot-pulse"></span> CHK
               </span>
             )}
             {health.status === "online" && (
-              <span
-                className="health-badge health-online"
-                title={`Connected to ${health.data?.service} (checked at ${health.lastChecked} UTC)`}
-              >
+              <span className="health-badge health-online" title="Backend API Connected">
                 <span className="dot dot-green"></span> ONLINE
-                <span className="latency">({health.latencyMs}ms)</span>
               </span>
             )}
             {health.status === "offline" && (
-              <button
-                type="button"
-                className="health-badge health-offline"
-                onClick={checkHealth}
-                title="Click to reconnect to backend"
-              >
-                <span className="dot dot-red"></span> OFFLINE (RETRY)
+              <button className="health-badge health-offline" onClick={checkHealth} title="Reconnect">
+                <span className="dot dot-red"></span> OFFLINE
               </button>
             )}
+          </div>
+        </div>
+
+        <div className="telemetry-item">
+          <span className="telemetry-label">DATA</span>
+          <div className="health-badge-wrapper">
+            <span className="health-badge health-online" title="Data Providers Active">
+              <span className="dot dot-green"></span> CACHED
+            </span>
+          </div>
+        </div>
+
+        <div className="telemetry-item">
+          <span className="telemetry-label">SUPABASE</span>
+          <div className="health-badge-wrapper">
+             <span className={`health-badge ${user?.isDemo ? 'health-offline' : 'health-online'}`} title={user?.isDemo ? 'Offline / Demo Mode' : 'Connected'}>
+                <span className={`dot ${user?.isDemo ? 'dot-amber' : 'dot-green'}`} style={{ backgroundColor: user?.isDemo ? 'var(--amber-neon)' : undefined }}></span> 
+                {user?.isDemo ? 'DEMO' : 'CONN'}
+             </span>
+          </div>
+        </div>
+
+        <div className="telemetry-item">
+          <span className="telemetry-label">ML</span>
+          <div className="health-badge-wrapper">
+             <span className="health-badge health-online" style={{ color: 'var(--cyan-bright)', borderColor: 'var(--cyan-bright)', background: 'rgba(56, 189, 248, 0.1)' }}>
+                <span className="dot dot-cyan" style={{ backgroundColor: 'var(--cyan-neon)' }}></span> AVAIL
+             </span>
           </div>
         </div>
       </div>

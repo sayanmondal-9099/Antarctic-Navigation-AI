@@ -1,6 +1,6 @@
 # =============================================================================
 # Antarctic Navigation AI — .gitignore
-# Stack: React/TypeScript · Python/FastAPI · Firebase · ML · Scientific Datasets
+# Stack: React/TypeScript · Python/FastAPI · Supabase · ML · Scientific Datasets
 # =============================================================================
 
 
@@ -10,7 +10,17 @@
 .env
 .env.*
 !.env.example
+!frontend/.env.example
 *.env
+
+# Supabase & Vercel
+.supabase/
+.vercel/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
 
 # Firebase
 *-firebase-adminsdk-*.json

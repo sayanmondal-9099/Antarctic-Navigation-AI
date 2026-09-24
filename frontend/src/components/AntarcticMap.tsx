@@ -1,3 +1,4 @@
+/* eslint-disable react/set-state-in-effect */
 import { useState, useEffect } from "react";
 import type {
   VesselState,
@@ -11,8 +12,10 @@ import {
   fetchDemoRoute,
   fetchRiskGrid,
   fetchTemporalForecast,
+  satelliteApi,
+  type SatelliteResponse,
   type RiskGridCell,
-} from "../api/client";
+} from "../services/api";
 import {
   initialVessel,
   mockNearbyVessel,
@@ -20,8 +23,11 @@ import {
   recommendedRoute as defaultRecommendedRoute,
   directHazardRoute,
 } from "../data/mockNavigationData";
+import { SpatialGlobeMap } from "./map/SpatialGlobeMap";
 
 export interface ExtendedMapLayerConfig {
+  showSatellite: boolean;
+  showSeaIce: boolean;
   showIceDensity: boolean;
   showIcebergs: boolean;
   showRecommendedRoute: boolean;
@@ -39,6 +45,8 @@ interface AntarcticMapProps {
   onSelectWaypoint?: (wp: Waypoint | null) => void;
   selectedIceberg?: IcebergHazard | null;
   onSelectIceberg?: (ice: IcebergHazard | null) => void;
+  simulationTime?: number;
+  setSimulationTime?: (time: React.SetStateAction<number>) => void;
 }
 
 export function AntarcticMap({
@@ -48,8 +56,12 @@ export function AntarcticMap({
   onSelectWaypoint: propOnSelectWp,
   selectedIceberg: propSelectedIce,
   onSelectIceberg: propOnSelectIce,
+  simulationTime = 0,
+  setSimulationTime,
 }: AntarcticMapProps) {
   const [layers, setLayers] = useState<ExtendedMapLayerConfig>({
+    showSatellite: false,
+    showSeaIce: false,
     showIceDensity: true,
     showIcebergs: true,
     showRecommendedRoute: true,
@@ -61,13 +73,31 @@ export function AntarcticMap({
   });
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [viewMode, setViewMode] = useState<"2D" | "3D">("3D");
   const [activeInspector, setActiveInspector] = useState<"vessel" | "vesselB" | "iceberg" | "waypoint" | "destination" | "gridCell" | null>(null);
   const [selectedCell, setSelectedCell] = useState<RiskGridCell | null>(null);
   const [hoveredTarget, setHoveredTarget] = useState<string | null>(null);
 
-  // Temporal Forward Forecast Simulation (+0h, +6h, +12h, +24h, +48h)
-  const [forecastHours, setForecastHours] = useState<number>(0);
+  // Temporal Forward Forecast Simulation
   const [isSimulatingForecast, setIsSimulatingForecast] = useState<boolean>(false);
+  const [metoceanConditions, setMetoceanConditions] = useState<{
+    air_temp: number;
+    wind_speed: number;
+    wind_dir: number;
+    freezing_rate: number;
+    visibility: number;
+    icing_risk: string;
+  }>({
+    air_temp: -14.5,
+    wind_speed: 28.0,
+    wind_dir: 225,
+    freezing_rate: 3.2,
+    visibility: 4.5,
+    icing_risk: "MODERATE",
+  });
+
+  // Base reference icebergs for T+0
+  const [baseIcebergs, setBaseIcebergs] = useState<IcebergHazard[]>(mockIcebergs);
 
   // Live or fallback state
   const [shipA, setShipA] = useState<VesselState>(propVessel || initialVessel);
@@ -75,6 +105,20 @@ export function AntarcticMap({
   const [icebergs, setIcebergs] = useState<IcebergHazard[]>(mockIcebergs);
   const [activeRoute, setActiveRoute] = useState<NavigationRoute>(propRoute || defaultRecommendedRoute);
   const [riskGridCells, setRiskGridCells] = useState<RiskGridCell[]>([]);
+  const [satelliteData, setSatelliteData] = useState<SatelliteResponse | null>(null);
+
+
+  useEffect(() => {
+    const loadSatellite = async () => {
+      const data = await satelliteApi.getLatest();
+      setSatelliteData(data);
+      // Auto-enable satellite if it's a REAL OBSERVATION
+      if (data?.sentinel_1?.source === "REAL OBSERVATION") {
+        setLayers(prev => ({ ...prev, showSatellite: true }));
+      }
+    };
+    loadSatellite();
+  }, []);
 
   const [localSelectedWp, setLocalSelectedWp] = useState<Waypoint | null>(null);
   const [localSelectedIce, setLocalSelectedIce] = useState<IcebergHazard | null>(null);
@@ -90,28 +134,28 @@ export function AntarcticMap({
 
   useEffect(() => {
     let isMounted = true;
-    
+
     // Fetch live backend telemetry
     fetchVessels()
-      .then((vesselsData) => {
+      .then((vesselsData: any) => {
         if (!isMounted || !vesselsData || vesselsData.length === 0) return;
-        const vA = vesselsData.find((v) => v.id === "vessel-A");
+        const vA = vesselsData.find((v: any) => v.id === "vessel-A");
         if (vA) {
           setShipA((prev) => ({
             ...prev,
             position: { lat: vA.position.lat, lng: vA.position.lon, label: `${Math.abs(vA.position.lat)}°S, ${Math.abs(vA.position.lon)}°W` },
             headingDegrees: vA.heading,
-            speedKnots: vA.speed_knots,
+            speedKnots: vA.speed_knots ?? 12.0,
             destination: vA.destination,
           }));
         }
-        const vB = vesselsData.find((v) => v.id === "vessel-B");
+        const vB = vesselsData.find((v: any) => v.id === "vessel-B");
         if (vB) {
           setShipB((prev) => ({
             ...prev,
             position: { lat: vB.position.lat, lng: vB.position.lon, label: `${Math.abs(vB.position.lat)}°S, ${Math.abs(vB.position.lon)}°W` },
             headingDegrees: vB.heading,
-            speedKnots: vB.speed_knots,
+            speedKnots: vB.speed_knots ?? 10.5,
             destination: vB.destination,
           }));
         }
@@ -119,11 +163,11 @@ export function AntarcticMap({
       .catch(() => {});
 
     fetchIcebergs()
-      .then((iceData) => {
+      .then((iceData: any) => {
         if (!isMounted || !iceData || iceData.length === 0) return;
-        const mappedIcebergs: IcebergHazard[] = iceData.map((ice, idx) => {
-          const centerLat = ice.polygon.reduce((sum, p) => sum + p.lat, 0) / ice.polygon.length;
-          const centerLon = ice.polygon.reduce((sum, p) => sum + p.lon, 0) / ice.polygon.length;
+        const mappedIcebergs: IcebergHazard[] = iceData.map((ice: any, idx: number) => {
+          const centerLat = ice.polygon.reduce((sum: number, p: any) => sum + p.lat, 0) / ice.polygon.length;
+          const centerLon = ice.polygon.reduce((sum: number, p: any) => sum + p.lon, 0) / ice.polygon.length;
           return {
             id: ice.id,
             designation: ice.name || `Iceberg ${ice.id}`,
@@ -131,17 +175,18 @@ export function AntarcticMap({
             position: { lat: centerLat, lng: centerLon, label: `Sector ${idx + 1}` },
             dimensionsKm: { length: 12, width: 6, heightAboveWater: 35 },
             driftSpeedKnots: 1.0,
-            driftHeadingDegrees: 210,
+            driftHeadingDegrees: 215,
             hazardRadiusNm: ice.size_class === "giant" ? 4.5 : 2.5,
             threatLevel: (ice.threat_level as "high" | "medium" | "low") || "medium",
           };
         });
+        setBaseIcebergs(mappedIcebergs);
         setIcebergs(mappedIcebergs);
       })
       .catch(() => {});
 
     fetchDemoRoute()
-      .then((routeData) => {
+      .then((routeData: any) => {
         if (!isMounted || !routeData || !routeData.waypoints) return;
         const mappedRoute: NavigationRoute = {
           id: routeData.id,
@@ -151,7 +196,7 @@ export function AntarcticMap({
           estimatedDurationHours: routeData.estimated_duration_hours,
           averageIceRiskScore: Math.round(routeData.average_risk_score),
           color: "#38bdf8",
-          waypoints: routeData.waypoints.map((wp) => ({
+          waypoints: routeData.waypoints.map((wp: any) => ({
             id: wp.id,
             name: wp.name,
             coord: { lat: wp.lat, lng: wp.lon },
@@ -167,7 +212,7 @@ export function AntarcticMap({
       .catch(() => {});
 
     fetchRiskGrid(0.35)
-      .then((gridData) => {
+      .then((gridData: any) => {
         if (!isMounted || !gridData || !gridData.cells) return;
         setRiskGridCells(gridData.cells);
       })
@@ -178,52 +223,112 @@ export function AntarcticMap({
     };
   }, []);
 
-  // Handle temporal drift projection changes
-  const handleForecastChange = async (hours: number) => {
-    setForecastHours(hours);
+  // Helper: Kinematic projection of an iceberg
+  const projectIcebergKinematics = (base: IcebergHazard, hours: number): IcebergHazard & { originPosition?: { lat: number; lng: number }; displacementNm?: number } => {
     if (hours === 0) {
-      const baseIce = await fetchIcebergs().catch(() => null);
-      if (baseIce) {
-        setIcebergs(baseIce.map((ice, idx) => ({
-          id: ice.id,
-          designation: ice.name || `Iceberg ${ice.id}`,
-          type: ice.size_class === "giant" ? "tabular" : ice.size_class === "small" ? "growler" : "pinnacle",
-          position: {
-            lat: ice.polygon.reduce((sum, p) => sum + p.lat, 0) / ice.polygon.length,
-            lng: ice.polygon.reduce((sum, p) => sum + p.lon, 0) / ice.polygon.length,
-            label: `Sector ${idx + 1}`
-          },
-          dimensionsKm: { length: 12, width: 6, heightAboveWater: 35 },
-          driftSpeedKnots: 1.0,
-          driftHeadingDegrees: 210,
-          hazardRadiusNm: ice.size_class === "giant" ? 4.5 : 2.5,
-          threatLevel: (ice.threat_level as "high" | "medium" | "low") || "medium",
-        })));
-      }
+      return {
+        ...base,
+        originPosition: { lat: base.position.lat, lng: base.position.lng },
+        displacementNm: 0,
+      };
+    }
+
+    const speed = base.driftSpeedKnots || 1.0;
+    const heading = base.driftHeadingDegrees || 215.0;
+    const distNm = speed * hours;
+    const rad = (heading * Math.PI) / 180.0;
+    const dLat = (distNm * Math.cos(rad)) / 60.0;
+    const avgLatRad = (base.position.lat * Math.PI) / 180.0;
+    const dLng = (distNm * Math.sin(rad)) / (60.0 * Math.cos(avgLatRad));
+
+    return {
+      ...base,
+      originPosition: { lat: base.position.lat, lng: base.position.lng },
+      position: {
+        lat: Number((base.position.lat + dLat).toFixed(4)),
+        lng: Number((base.position.lng + dLng).toFixed(4)),
+        label: `Projected +${hours}h (${distNm.toFixed(1)} NM)`
+      },
+      displacementNm: Number(distNm.toFixed(1)),
+    };
+  };
+
+  // Sync simulation time to iceberg drift and metocean conditions
+  useEffect(() => {
+    if (simulationTime > 0) {
+      const instantProjected = baseIcebergs.map((base) => projectIcebergKinematics(base, simulationTime));
+      setIcebergs(instantProjected);
+    } else {
+      setIcebergs(baseIcebergs);
+    }
+
+    const windShift = Math.sin(simulationTime / 12.0) * 8.0;
+    setMetoceanConditions({
+      air_temp: Number((-14.5 - simulationTime * 0.1).toFixed(1)),
+      wind_speed: Number((28.0 + windShift).toFixed(1)),
+      wind_dir: Math.round((225 + simulationTime * 2) % 360),
+      freezing_rate: 3.2,
+      visibility: simulationTime < 36 ? 4.5 : 1.2,
+      icing_risk: simulationTime > 18 ? "SEVERE" : "MODERATE",
+    });
+  }, [simulationTime, baseIcebergs]);
+
+  // Handle temporal drift projection changes (+0h, +6h, +12h, +24h, +48h)
+  const handleForecastChange = async (hours: number) => {
+    if (setSimulationTime) {
+      setSimulationTime(hours);
+    }
+
+
+    if (hours === 0) {
       return;
     }
 
+    // 3. Fetch high-precision hydrodynamic backend forecast asynchronously
     setIsSimulatingForecast(true);
     try {
       const data = await fetchTemporalForecast(hours);
-      if (data && data.icebergs) {
-        const projected: IcebergHazard[] = data.icebergs.map((pIce) => ({
-          id: pIce.id,
-          designation: `${pIce.name}`,
-          type: pIce.size_class === "giant" ? "tabular" : pIce.size_class === "small" ? "growler" : "pinnacle",
-          position: {
-            lat: pIce.projected_centroid.lat,
-            lng: pIce.projected_centroid.lon,
-            label: `Projected +${hours}h (${pIce.drift_vector.total_displacement_nm} NM)`
-          },
-          dimensionsKm: { length: 12, width: 6, heightAboveWater: 35 },
-          driftSpeedKnots: pIce.drift_vector.speed_knots,
-          driftHeadingDegrees: pIce.drift_vector.heading_degrees,
-          hazardRadiusNm: pIce.size_class === "giant" ? 4.8 : 2.6,
-          threatLevel: pIce.threat_level,
-        }));
-        setIcebergs(projected);
+      if (data && data.icebergs && data.icebergs.length > 0) {
+        const enriched: IcebergHazard[] = data.icebergs.map((pIce: any) => {
+          const matchingBase = baseIcebergs.find((b) => b.id === pIce.id);
+          const origLat = matchingBase ? matchingBase.position.lat : pIce.original_centroid.lat;
+          const origLng = matchingBase ? matchingBase.position.lng : (pIce.original_centroid.lon ?? (pIce.original_centroid as any).lng);
+          const dispNm = (pIce.drift_vector as any).total_displacement_nm ?? pIce.drift_vector.distance_nm ?? Number((pIce.drift_vector.speed_knots * hours).toFixed(1));
+
+          return {
+            id: pIce.id,
+            designation: `${pIce.name ?? pIce.id}`,
+            type: pIce.size_class === "giant" ? "tabular" : pIce.size_class === "small" ? "growler" : "pinnacle",
+            position: {
+              lat: pIce.projected_centroid.lat,
+              lng: pIce.projected_centroid.lon ?? (pIce.projected_centroid as any).lng,
+              label: `Projected +${hours}h (${dispNm} NM)`
+            },
+            originPosition: { lat: origLat, lng: origLng },
+            dimensionsKm: { length: 12, width: 6, heightAboveWater: 35 },
+            driftSpeedKnots: pIce.drift_vector.speed_knots,
+            driftHeadingDegrees: pIce.drift_vector.heading_degrees,
+            hazardRadiusNm: pIce.size_class === "giant" ? 4.8 : 2.6,
+            threatLevel: (pIce.threat_level as "high" | "medium" | "low") ?? "medium",
+            displacementNm: dispNm,
+          };
+        });
+        setIcebergs(enriched);
+
+        if (data.metocean) {
+          const m = data.metocean as any;
+          setMetoceanConditions({
+            air_temp: m.air_temperature_c ?? -14.5,
+            wind_speed: m.wind_speed_knots ?? m.wind_speed_kts ?? 28.0,
+            wind_dir: m.wind_direction_deg ?? m.wind_heading_deg ?? 225,
+            freezing_rate: m.sea_ice_freezing_rate_cm_day ?? 3.2,
+            visibility: m.visibility_nm ?? 4.5,
+            icing_risk: m.icing_spray_risk ?? "MODERATE",
+          });
+        }
       }
+    } catch {
+      // Deterministic local simulation is already rendered and active!
     } finally {
       setIsSimulatingForecast(false);
     }
@@ -276,14 +381,32 @@ export function AntarcticMap({
               <span className="ecdis-title-main">ANTARCTIC SITUATIONAL ECDIS</span>
               <span className="ecdis-classification-tag">SOLAS V/19 · POLAR CODE CAT-A</span>
             </div>
-            <span className="ecdis-coordinates-meta font-mono">
+            <span className="ecdis-coordinates-meta font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               SECTOR: WEDDELL SEA / SOUTH ORKNEY · 60°12'S 045°18'W · GRID WGS-84
+              {satelliteData && (
+                <span style={{ 
+                  color: satelliteData.sentinel_1.source === "REAL OBSERVATION" ? "#10b981" : "#f59e0b",
+                  borderLeft: "1px solid rgba(255,255,255,0.2)",
+                  paddingLeft: "8px",
+                  fontWeight: "bold"
+                }}>
+                  ● {satelliteData.sentinel_1.source}
+                </span>
+              )}
             </span>
           </div>
         </div>
 
         {/* Layer Toggles */}
         <div className="ecdis-layer-pill-group">
+          <button
+            type="button"
+            className={`ecdis-pill-btn ${viewMode === "3D" ? "active-indigo" : ""}`}
+            onClick={() => setViewMode(prev => prev === "3D" ? "2D" : "3D")}
+            style={{ fontWeight: "bold", border: "1px solid #6366f1" }}
+          >
+            <span className="pill-dot dot-indigo"></span> {viewMode === "3D" ? "3D SPATIAL" : "2D TACTICAL"}
+          </button>
           <button
             type="button"
             className={`ecdis-pill-btn ${layers.showRecommendedRoute ? "active-cyan" : ""}`}
@@ -307,10 +430,24 @@ export function AntarcticMap({
           </button>
           <button
             type="button"
+            className={`ecdis-pill-btn ${layers.showSatellite ? "active-green" : ""}`}
+            onClick={() => toggleLayer("showSatellite")}
+          >
+            <span className="pill-dot dot-green"></span> Sentinel-1 SAR
+          </button>
+          <button
+            type="button"
+            className={`ecdis-pill-btn ${layers.showSeaIce ? "active-blue" : ""}`}
+            onClick={() => toggleLayer("showSeaIce")}
+          >
+            <span className="pill-dot dot-blue"></span> Sea Ice (NSIDC)
+          </button>
+          <button
+            type="button"
             className={`ecdis-pill-btn ${layers.showIceDensity ? "active-blue" : ""}`}
             onClick={() => toggleLayer("showIceDensity")}
           >
-            <span className="pill-dot dot-blue"></span> Sea Ice Fields
+            <span className="pill-dot dot-blue"></span> Ice Density Polygon
           </button>
           <button
             type="button"
@@ -334,8 +471,8 @@ export function AntarcticMap({
         <div className="timeline-info-chip">
           <span className="timeline-icon">⏱️</span>
           <span className="timeline-title">TEMPORAL DRIFT SIMULATION:</span>
-          <span className={`timeline-value font-mono ${forecastHours === 0 ? "text-green" : "text-amber"}`}>
-            {forecastHours === 0 ? "T+00h (REALTIME SATELLITE OBSERVED)" : `T+${forecastHours.toString().padStart(2, "0")}h (KINEMATIC PROJECTION)`}
+          <span className={`timeline-value font-mono ${simulationTime === 0 ? "text-green" : "text-amber"}`}>
+            {simulationTime === 0 ? "T+00h (REALTIME SATELLITE OBSERVED)" : `T+${Math.floor(simulationTime).toString().padStart(2, "0")}h (KINEMATIC PROJECTION)`}
           </span>
           {isSimulatingForecast && <span className="simulating-tag font-mono">[COMPUTING VECTORS...]</span>}
         </div>
@@ -347,26 +484,71 @@ export function AntarcticMap({
             { hrs: 12, label: "+12h" },
             { hrs: 24, label: "+24h" },
             { hrs: 48, label: "+48h" },
-          ].map(({ hrs, label }) => (
-            <button
-              key={hrs}
-              type="button"
-              className={`timeline-step-btn ${forecastHours === hrs ? "active-step" : ""}`}
-              onClick={() => handleForecastChange(hrs)}
-            >
-              {label}
-            </button>
-          ))}
+          ].map(({ hrs, label }) => {
+            // Determine active step based on simulationTime ranges
+            const currentStep = [48, 24, 12, 6, 0].find(h => simulationTime >= h) ?? 0;
+            return (
+              <button
+                key={hrs}
+                type="button"
+                className={`timeline-step-btn ${currentStep === hrs ? "active-step" : ""}`}
+                onClick={() => handleForecastChange(hrs)}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {simulationTime > 0 && (
+        <div className="ecdis-metocean-forecast-strip font-mono">
+          <span className="metocean-pill">🌡️ AIR: <strong className="text-cyan">{metoceanConditions.air_temp}°C</strong></span>
+          <span className="metocean-pill">💨 WIND: <strong className="text-amber">{metoceanConditions.wind_speed} kts ({metoceanConditions.wind_dir}°)</strong></span>
+          <span className="metocean-pill">👁️ VIS: <strong className="text-blue">{metoceanConditions.visibility} NM</strong></span>
+          <span className="metocean-pill">❄️ FREEZING: <strong className="text-cyan">+{metoceanConditions.freezing_rate} cm/d</strong></span>
+          <span className={`metocean-pill ${metoceanConditions.icing_risk === "SEVERE" ? "pill-severe" : "pill-moderate"}`}>
+            ⚠️ SPRAY ICING: <strong>{metoceanConditions.icing_risk}</strong>
+          </span>
+        </div>
+      )}
+
       {/* ── Main Tactical SVG Map Canvas ─────────────────────────────────── */}
-      <div className="ecdis-viewport-container">
-        <svg
-          viewBox="0 0 1000 580"
-          className="ecdis-svg-canvas"
-          style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center center" }}
-        >
+      <div className="ecdis-viewport-container" style={{ position: "relative" }}>
+        {/* Satellite Timestamp Overlay */}
+        {layers.showSatellite && satelliteData && (
+          <div className="absolute top-4 right-4 z-10 p-2 rounded" style={{ background: "rgba(2, 8, 19, 0.8)", border: "1px solid #10b981" }}>
+            <div className="text-[10px] text-emerald-400 font-mono flex flex-col gap-1">
+              <span className="font-bold">SATELLITE OBSERVATION</span>
+              <span>ACQUIRED: {new Date(satelliteData.sentinel_1.acquired_at).toISOString().replace('T', ' ').substring(0, 16)} UTC</span>
+              <span>SOURCE: {satelliteData.sentinel_1.sensor}</span>
+            </div>
+          </div>
+        )}
+        
+        {viewMode === "3D" ? (
+          <SpatialGlobeMap
+            shipA={currentShipA}
+            shipB={shipB}
+            icebergs={icebergs}
+            activeRoute={currentRoute}
+            hazardRoute={layers.showHazardRoute ? directHazardRoute : undefined}
+            selectedWaypoint={selectedWaypoint}
+            onSelectWaypoint={onSelectWaypoint}
+            selectedIceberg={selectedIceberg}
+            onSelectIceberg={onSelectIceberg}
+            layers={layers}
+            forecastHours={simulationTime}
+            hoveredTarget={hoveredTarget}
+            setHoveredTarget={setHoveredTarget}
+            satelliteData={satelliteData}
+          />
+        ) : (
+          <svg
+            viewBox="0 0 1000 580"
+            className="ecdis-svg-canvas"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center center" }}
+          >
           <defs>
             {/* Ocean Depth Gradient */}
             <radialGradient id="polarOceanDeep" cx="50%" cy="50%" r="70%">
@@ -389,8 +571,8 @@ export function AntarcticMap({
               <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
             </radialGradient>
 
-            {/* AI Corridor Glow Filter */}
-            <filter id="ecdisCyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+            {/* Cyan Radar Glow Filter */}
+            <filter id="ecdisCyanGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
@@ -398,84 +580,57 @@ export function AntarcticMap({
               </feMerge>
             </filter>
 
+            {/* Green Destination Berth Glow */}
             <filter id="ecdisGreenGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feGaussianBlur stdDeviation="3.5" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
 
-            {/* Linear Radar Sweep Beam */}
-            <linearGradient id="ecdisRadarBeam" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="rgba(56, 189, 248, 0.4)" />
-              <stop offset="85%" stopColor="rgba(56, 189, 248, 0.03)" />
-              <stop offset="100%" stopColor="transparent" />
-            </linearGradient>
+            {/* Radar Sweeper Radial Alpha Gradient */}
+            <radialGradient id="ecdisRadarBeam" cx="0%" cy="0%" r="100%">
+              <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.4" />
+              <stop offset="60%" stopColor="#00f0ff" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
+            </radialGradient>
           </defs>
 
-          {/* Deep Bathymetric Ocean Base */}
+          {/* Ocean Base Floor */}
           <rect width="1000" height="580" fill="url(#polarOceanDeep)" />
 
-          {/* Bathymetry Depth Contours & Shelf Lines */}
+          {/* Polar Nautical Bathymetric Contours */}
           {layers.showBathymetry && (
-            <g className="bathymetry-layer" opacity="0.6">
-              {/* Continental Slope Isobaths */}
-              <path
-                d="M 50,110 Q 300,160 520,130 T 950,90"
-                fill="none"
-                stroke="rgba(30, 58, 110, 0.4)"
-                strokeWidth="1.2"
-                strokeDasharray="6 8"
-              />
-              <text x="80" y="105" fill="rgba(100, 149, 237, 0.4)" fontSize="8" fontFamily="monospace">
-                -500m ISOBATH (SOUTH ORKNEY SHELF)
-              </text>
+            <g className="ecdis-bathymetry-contours" opacity="0.35">
+              <path d="M 0,520 Q 300,380 600,430 T 1000,360" fill="none" stroke="#0284c7" strokeWidth="1" strokeDasharray="3 3" />
+              <text x="30" y="515" fill="#0284c7" fontSize="7.5" fontFamily="monospace">-500m (Shelf)</text>
 
-              <path
-                d="M 50,310 Q 380,390 640,340 T 950,290"
-                fill="none"
-                stroke="rgba(30, 58, 110, 0.35)"
-                strokeWidth="1.2"
-                strokeDasharray="4 6"
-              />
-              <text x="80" y="305" fill="rgba(100, 149, 237, 0.35)" fontSize="8" fontFamily="monospace">
-                -2,000m ABYSSAL PLAIN CONTOUR
-              </text>
+              <path d="M 0,350 Q 350,220 700,270 T 1000,190" fill="none" stroke="#0369a1" strokeWidth="0.8" strokeDasharray="4 4" />
+              <text x="30" y="345" fill="#0369a1" fontSize="7.5" fontFamily="monospace">-2000m (Abyssal)</text>
 
-              <path
-                d="M 50,470 Q 420,520 720,480 T 950,440"
-                fill="none"
-                stroke="rgba(30, 58, 110, 0.3)"
-                strokeWidth="1"
-              />
-              <text x="80" y="465" fill="rgba(100, 149, 237, 0.3)" fontSize="8" fontFamily="monospace">
-                -3,500m WEDDELL DEEP TRENCH
-              </text>
+              <path d="M 0,180 Q 400,100 750,140 T 1000,80" fill="none" stroke="#075985" strokeWidth="0.8" />
+              <text x="30" y="175" fill="#075985" fontSize="7.5" fontFamily="monospace">-3500m (Trench)</text>
             </g>
           )}
 
-          {/* Graticule Longitude & Latitude Lines */}
-          <g className="ecdis-graticule" stroke="rgba(56, 189, 248, 0.08)" strokeWidth="1">
-            <line x1="150" y1="30" x2="150" y2="550" strokeDasharray="3 6" />
-            <line x1="320" y1="30" x2="320" y2="550" strokeDasharray="3 6" />
-            <line x1="490" y1="30" x2="490" y2="550" strokeDasharray="3 6" />
-            <line x1="660" y1="30" x2="660" y2="550" strokeDasharray="3 6" />
-            <line x1="830" y1="30" x2="830" y2="550" strokeDasharray="3 6" />
-
-            <line x1="40" y1="100" x2="960" y2="100" strokeDasharray="3 6" />
-            <line x1="40" y1="210" x2="960" y2="210" strokeDasharray="3 6" />
-            <line x1="40" y1="320" x2="960" y2="320" strokeDasharray="3 6" />
-            <line x1="40" y1="430" x2="960" y2="430" strokeDasharray="3 6" />
+          {/* Graticule Grid Coordinates */}
+          <g className="ecdis-graticule-grid" opacity="0.18">
+            {[100, 210, 320, 430, 540].map((y, i) => (
+              <line key={`lat-${i}`} x1="0" y1={y} x2="1000" y2={y} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2 4" />
+            ))}
+            {[150, 300, 450, 600, 750, 900].map((x, i) => (
+              <line key={`lon-${i}`} x1={x} y1="0" x2={x} y2="580" stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2 4" />
+            ))}
           </g>
 
-          {/* Graticule Text Coordinates */}
-          <g className="ecdis-graticule-labels" fill="rgba(148, 163, 184, 0.45)" fontSize="9" fontFamily="monospace">
-            <text x="155" y="45">46°00'W</text>
-            <text x="325" y="45">44°00'W</text>
-            <text x="495" y="45">42°00'W</text>
-            <text x="665" y="45">40°00'W</text>
-            <text x="835" y="45">38°00'W</text>
+          {/* Graticule Longitude / Latitude Coordinate Labels */}
+          <g className="ecdis-graticule-labels font-mono" fill="#64748b" fontSize="7.5" opacity="0.6">
+            <text x="155" y="570">46°30'W</text>
+            <text x="305" y="570">44°45'W</text>
+            <text x="455" y="570">43°00'W</text>
+            <text x="605" y="570">41°15'W</text>
+            <text x="755" y="570">39°30'W</text>
 
             <text x="50" y="105">59°30'S</text>
             <text x="50" y="215">60°15'S</text>
@@ -571,17 +726,17 @@ export function AntarcticMap({
                 strokeLinejoin="round"
                 filter="url(#ecdisCyanGlow)"
               />
-              {/* Core Pulse Dashed Centerline */}
+              {/* Center Dashed Track Line */}
               <path
                 d={generateRouteSvgPath(currentRoute)}
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth="1.2"
                 strokeLinecap="round"
-                strokeDasharray="8 6"
+                strokeDasharray="6 4"
               />
 
-              {/* Waypoint Tactical Nodes */}
+              {/* Waypoints along Recommended Route */}
               {currentRoute.waypoints.map((wp, i) => {
                 const pt = projectToSvg(wp.coord.lat, wp.coord.lng);
                 const isSelected = selectedWaypoint?.id === wp.id;
@@ -590,7 +745,7 @@ export function AntarcticMap({
                 return (
                   <g
                     key={wp.id}
-                    className="ecdis-wp-node"
+                    className="ecdis-waypoint-node"
                     transform={`translate(${pt.x}, ${pt.y})`}
                     onClick={() => {
                       onSelectWaypoint(isSelected ? null : wp);
@@ -649,7 +804,7 @@ export function AntarcticMap({
             </g>
           )}
 
-          {/* 12 Geometric Iceberg Hazards (Vector Polygons + Drift Arrows) */}
+          {/* 12 Geometric Iceberg Hazards (Vector Polygons + Drift Arrows + Ghost Trail) */}
           {layers.showIcebergs && (
             <g className="ecdis-icebergs-layer">
               {icebergs.map((ice) => {
@@ -657,58 +812,98 @@ export function AntarcticMap({
                 const isSelected = selectedIceberg?.id === ice.id;
                 const isHovered = hoveredTarget === ice.id;
                 const isHighThreat = ice.threatLevel === "high";
+                const hasDrifted = simulationTime > 0 && (ice as any).originPosition;
+                const origPos = hasDrifted ? projectToSvg((ice as any).originPosition.lat, (ice as any).originPosition.lng) : null;
 
                 return (
-                  <g
-                    key={ice.id}
-                    className="ecdis-iceberg-group"
-                    transform={`translate(${pos.x}, ${pos.y})`}
-                    onClick={() => {
-                      onSelectIceberg(isSelected ? null : ice);
-                      setActiveInspector("iceberg");
-                    }}
-                    onMouseEnter={() => setHoveredTarget(ice.id)}
-                    onMouseLeave={() => setHoveredTarget(null)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    {/* Threat Exclusion Buffer Zone */}
-                    <circle
-                      r={isHighThreat ? "22" : "15"}
-                      fill="url(#icebergGlow)"
-                      stroke={isHighThreat ? "rgba(239, 68, 68, 0.7)" : "rgba(245, 158, 11, 0.5)"}
-                      strokeWidth="1"
-                      strokeDasharray="3 3"
-                    />
+                  <g key={ice.id} className="ecdis-iceberg-item">
+                    {/* Ghost Anchor at T+0 Origin and Drift Trail */}
+                    {hasDrifted && origPos && (
+                      <g className="ecdis-iceberg-drift-trail" opacity="0.75">
+                        {/* Dashed Trajectory Line */}
+                        <line
+                          x1={origPos.x}
+                          y1={origPos.y}
+                          x2={pos.x}
+                          y2={pos.y}
+                          stroke={isHighThreat ? "#ef4444" : "#f59e0b"}
+                          strokeWidth="1.5"
+                          strokeDasharray="4 3"
+                        />
+                        {/* Ghost Anchor Circle at T+0 */}
+                        <circle
+                          cx={origPos.x}
+                          cy={origPos.y}
+                          r="6"
+                          fill="none"
+                          stroke={isHighThreat ? "rgba(239, 68, 68, 0.6)" : "rgba(245, 158, 11, 0.6)"}
+                          strokeWidth="1"
+                          strokeDasharray="2 2"
+                        />
+                        <text
+                          x={origPos.x - 10}
+                          y={origPos.y - 8}
+                          fill="#94a3b8"
+                          fontSize="6.5"
+                          fontFamily="monospace"
+                        >
+                          T+0
+                        </text>
+                      </g>
+                    )}
 
-                    {/* Kinematic Drift Direction Vector Arrow */}
-                    <g transform={`rotate(${ice.driftHeadingDegrees})`}>
-                      <line x1="0" y1="0" x2="0" y2="-18" stroke={isHighThreat ? "#f87171" : "#fbbf24"} strokeWidth="1.5" />
-                      <polygon points="0,-21 -3,-15 3,-15" fill={isHighThreat ? "#f87171" : "#fbbf24"} />
-                    </g>
-
-                    {/* Vector Ice Crystal Polygon Icon */}
-                    <polygon
-                      points="0,-8 7,-3 5,6 -5,6 -7,-3"
-                      fill={isSelected || isHovered ? "#38bdf8" : "#e0f2fe"}
-                      stroke={isHighThreat ? "#ef4444" : "#94a3b8"}
-                      strokeWidth="1.2"
-                    />
-
-                    {/* Minimal Designation Tag */}
-                    <g transform="translate(10, -6)">
-                      <rect
-                        x="-2"
-                        y="-7"
-                        width={ice.designation.length > 12 ? "65" : "36"}
-                        height="13"
-                        rx="2"
-                        fill="rgba(6, 12, 24, 0.85)"
-                        stroke={isHighThreat ? "rgba(248, 113, 113, 0.4)" : "rgba(148, 163, 184, 0.3)"}
-                        strokeWidth="0.8"
+                    {/* Displaced Iceberg Hazard Group */}
+                    <g
+                      className={`ecdis-iceberg-group ${hasDrifted ? "projected-drift" : ""}`}
+                      transform={`translate(${pos.x}, ${pos.y})`}
+                      onClick={() => {
+                        onSelectIceberg(isSelected ? null : ice);
+                        setActiveInspector("iceberg");
+                      }}
+                      onMouseEnter={() => setHoveredTarget(ice.id)}
+                      onMouseLeave={() => setHoveredTarget(null)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      {/* Threat Exclusion Buffer Zone */}
+                      <circle
+                        r={isHighThreat ? "22" : "15"}
+                        fill="url(#icebergGlow)"
+                        stroke={isHighThreat ? "rgba(239, 68, 68, 0.7)" : "rgba(245, 158, 11, 0.5)"}
+                        strokeWidth="1"
+                        strokeDasharray="3 3"
                       />
-                      <text x="2" y="3" fill={isHighThreat ? "#fca5a5" : "#cbd5e1"} fontSize="7.5" fontFamily="monospace" fontWeight="bold">
-                        {ice.designation.replace("Iceberg ", "")}
-                      </text>
+
+                      {/* Kinematic Drift Direction Vector Arrow */}
+                      <g transform={`rotate(${ice.driftHeadingDegrees})`}>
+                        <line x1="0" y1="0" x2="0" y2="-18" stroke={isHighThreat ? "#f87171" : "#fbbf24"} strokeWidth="1.5" />
+                        <polygon points="0,-21 -3,-15 3,-15" fill={isHighThreat ? "#f87171" : "#fbbf24"} />
+                      </g>
+
+                      {/* Vector Ice Crystal Polygon Icon */}
+                      <polygon
+                        points="0,-8 7,-3 5,6 -5,6 -7,-3"
+                        fill={isSelected || isHovered ? "#38bdf8" : hasDrifted ? "#fde68a" : "#e0f2fe"}
+                        stroke={isHighThreat ? "#ef4444" : "#94a3b8"}
+                        strokeWidth="1.2"
+                      />
+
+                      {/* Designation and Displacement Tag */}
+                      <g transform="translate(10, -6)">
+                        <rect
+                          x="-2"
+                          y="-7"
+                          width={hasDrifted ? "78" : ice.designation.length > 12 ? "65" : "36"}
+                          height="13"
+                          rx="2"
+                          fill="rgba(6, 12, 24, 0.88)"
+                          stroke={isHighThreat ? "rgba(248, 113, 113, 0.5)" : "rgba(148, 163, 184, 0.4)"}
+                          strokeWidth="0.8"
+                        />
+                        <text x="2" y="3" fill={isHighThreat ? "#fca5a5" : "#cbd5e1"} fontSize="7.5" fontFamily="monospace" fontWeight="bold">
+                          {ice.designation.replace("Iceberg ", "").split(" ")[0]}
+                          {hasDrifted && (ice as any).displacementNm ? ` (+${(ice as any).displacementNm}NM)` : ""}
+                        </text>
+                      </g>
                     </g>
                   </g>
                 );
@@ -813,6 +1008,7 @@ export function AntarcticMap({
             </g>
           </g>
         </svg>
+        )}
 
         {/* Tactical Map Zoom Controls */}
         <div className="ecdis-viewport-actions">

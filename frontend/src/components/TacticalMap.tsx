@@ -7,7 +7,7 @@ import type {
   MapLayerConfig,
 } from "../types/navigation";
 
-interface AntarcticMapProps {
+interface TacticalMapProps {
   vessel: VesselState;
   icebergs: IcebergHazard[];
   recommendedRoute: NavigationRoute;
@@ -18,7 +18,7 @@ interface AntarcticMapProps {
   onSelectIceberg: (ice: IcebergHazard | null) => void;
 }
 
-export function AntarcticMap({
+export function TacticalMap({
   vessel,
   icebergs,
   recommendedRoute,
@@ -27,7 +27,7 @@ export function AntarcticMap({
   onSelectWaypoint,
   selectedIceberg,
   onSelectIceberg,
-}: AntarcticMapProps) {
+}: TacticalMapProps) {
   const [layers, setLayers] = useState<MapLayerConfig>({
     showIceDensity: true,
     showIcebergs: true,
@@ -36,6 +36,8 @@ export function AntarcticMap({
     showRangeRings: true,
     showRadarSweep: true,
     showBathymetry: true,
+    showWind: false,
+    showCurrent: false,
   });
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -122,6 +124,22 @@ export function AntarcticMap({
             title="Toggle Polar Radar Sweep"
           >
             📡 Radar
+          </button>
+          <button
+            type="button"
+            className={`layer-btn ${layers.showWind ? "active-blue" : ""}`}
+            onClick={() => toggleLayer("showWind")}
+            title="Toggle Wind Vectors"
+          >
+            💨 Wind
+          </button>
+          <button
+            type="button"
+            className={`layer-btn ${layers.showCurrent ? "active-indigo" : ""}`}
+            onClick={() => toggleLayer("showCurrent")}
+            title="Toggle Ocean Currents"
+          >
+            🌊 Currents
           </button>
         </div>
       </div>
@@ -350,6 +368,41 @@ export function AntarcticMap({
             </g>
           )}
 
+          {/* Wind Vectors */}
+          {layers.showWind && (
+            <g className="wind-layer" stroke="#60a5fa" strokeWidth="1.5" opacity="0.6">
+              {[...Array(20)].map((_, i) => {
+                const x = 100 + (i % 5) * 150;
+                const y = 80 + Math.floor(i / 5) * 100;
+                const angle = 270; // Simulate prevailing westerlies
+                return (
+                  <g key={`wind-${i}`} transform={`translate(${x},${y}) rotate(${angle})`}>
+                    <line x1="0" y1="0" x2="30" y2="0" />
+                    <line x1="25" y1="-5" x2="30" y2="0" />
+                    <line x1="25" y1="5" x2="30" y2="0" />
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* Ocean Currents */}
+          {layers.showCurrent && (
+            <g className="current-layer" stroke="#818cf8" strokeWidth="2" opacity="0.5">
+              {[...Array(15)].map((_, i) => {
+                const x = 120 + (i % 5) * 160;
+                const y = 90 + Math.floor(i / 5) * 120;
+                const angle = y < 280 ? 270 : 135; // Match our demo data pattern
+                return (
+                  <g key={`curr-${i}`} transform={`translate(${x},${y}) rotate(${angle})`}>
+                    <path d="M 0,0 Q 15,-10 30,0 T 60,0" fill="none" />
+                    <polygon points="60,0 55,-4 55,4" fill="#818cf8" />
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
           {/* Iceberg Hazards */}
           {layers.showIcebergs && (
             <g className="icebergs-layer">
@@ -514,7 +567,7 @@ export function AntarcticMap({
                   {Math.abs(selectedWaypoint.coord.lat).toFixed(2)}°S, {Math.abs(selectedWaypoint.coord.lng).toFixed(2)}°W
                 </span>
                 <span>Ice Concentration:</span>
-                <span className="font-mono highlight-cyan">{selectedWaypoint.iceConcentrationTenths}/10</span>
+                <span className="font-mono status-cyan">{selectedWaypoint.iceConcentrationTenths}/10</span>
                 <span>Ice Thickness:</span>
                 <span className="font-mono">{selectedWaypoint.iceThicknessMeters} m</span>
                 <span>Sounding Depth:</span>
@@ -545,7 +598,7 @@ export function AntarcticMap({
               <p className="inspector-name">{selectedIceberg.designation}</p>
               <div className="inspector-grid">
                 <span>Threat Rating:</span>
-                <span className="font-mono highlight-red">{selectedIceberg.threatLevel.toUpperCase()}</span>
+                <span className="font-mono status-crit">{selectedIceberg.threatLevel.toUpperCase()}</span>
                 <span>Dimensions:</span>
                 <span className="font-mono">
                   {selectedIceberg.dimensionsKm.length} × {selectedIceberg.dimensionsKm.width} km (+{selectedIceberg.dimensionsKm.heightAboveWater}m)
@@ -566,7 +619,7 @@ export function AntarcticMap({
       <div className="map-footer-summary">
         <div className="summary-col">
           <span className="summary-label">ACTIVE ROUTE</span>
-          <span className="summary-val highlight-cyan">
+          <span className="summary-val status-cyan">
             {recommendedRoute.name} ({recommendedRoute.totalDistanceNm} NM)
           </span>
         </div>
@@ -576,7 +629,7 @@ export function AntarcticMap({
         </div>
         <div className="summary-col">
           <span className="summary-label">COLLISION RISK REDUCTION</span>
-          <span className="summary-val highlight-green">−72% vs Direct Channel</span>
+          <span className="summary-val status-low">−72% vs Direct Channel</span>
         </div>
       </div>
     </section>

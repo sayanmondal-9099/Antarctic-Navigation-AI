@@ -88,6 +88,15 @@ def calculate_deterministic_route(
         total_distance_nm=round(total_dist, 1),
         estimated_duration_hours=round(duration_hours, 1),
         average_risk_score=26.5,
+        risk_level="LOW",
+        routing_mode="balanced",
+        risk_breakdown={
+            "ice": 10.0,
+            "iceberg": 5.0,
+            "weather": 5.0,
+            "current": 2.0,
+            "vessel": 4.5
+        },
         waypoints=waypoints,
         advisories=[
             "Deterministic fallback route active: Cleared 12 iceberg hazard perimeters.",

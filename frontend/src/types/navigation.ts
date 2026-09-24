@@ -80,4 +80,6 @@ export interface MapLayerConfig {
   showRangeRings: boolean;
   showRadarSweep: boolean;
   showBathymetry: boolean;
+  showWind: boolean;
+  showCurrent: boolean;
 }

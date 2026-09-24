@@ -49,6 +49,34 @@ export const mockNearbyVessel: VesselState = {
   status: "icebreaking",
 };
 
+export const mockVesselC: VesselState = {
+  id: "vessel-C",
+  name: "Ship C (R/V Kronprins Haakon)",
+  callSign: "NO-7140",
+  vesselClass: "Polar Research Vessel",
+  iceClass: "IACS Polar Class 3 (PC3)",
+  position: {
+    lat: -59.4,
+    lng: -41.2,
+    label: "Scotia Sea Boundary (59.4°S, 41.2°W)",
+  },
+  speedKnots: 14.0,
+  headingDegrees: 160,
+  targetSpeedKnots: 14.0,
+  destination: "Rothera Station",
+  eta: "14h 30m",
+  fuelPercentage: 92,
+  hullStrainMpa: 11.8,
+  engineLoadPercentage: 68,
+  status: "cruising",
+};
+
+export const mockAllVessels: VesselState[] = [
+  initialVessel,
+  mockNearbyVessel,
+  mockVesselC,
+];
+
 export const mockIcebergs: IcebergHazard[] = [
   {
     id: "iceberg-01",
